@@ -1,6 +1,6 @@
 ---
 title: "Lab 0 Test"
-author: "Your Name"
+author: "Bright Joses"
 date: "`r Sys.Date()`"
 output: html_document
 ---
