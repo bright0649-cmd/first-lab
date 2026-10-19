@@ -1,0 +1,15 @@
+---
+title: "Lab 0 Test"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Setup check
+
+```{r}
+summary(cars)
+plot(cars)
+```
+
+R version: `r R.version.string`
