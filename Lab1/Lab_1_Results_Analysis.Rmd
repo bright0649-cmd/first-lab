@@ -1,0 +1,195 @@
+---
+title: "Lab 1: The One-Group Results File"
+author: "Bright Joses"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(ggplot2)
+set.seed(42)
+```
+
+# Part 1: Reproducible workflow
+
+This document combines code, output and interpretation. The data file
+`COSC_423_Results.csv` sits in the same folder as this `.Rmd`, so it can be
+re-knitted on any machine.
+
+## Load and tidy the data
+
+The sheet has three header rows (title, maximum marks, column names) and two
+columns both called "Total" (attendance and final mark), so I skip the header
+rows and name the 47 columns myself.
+
+```{r load}
+col_names <- c("id", paste0("att_", 1:20), "att_total", "att_marks", "att_pct",
+               "gender", "cgpa_range", "att_score", paste0("q", 1:6), "quiz",
+               "a1", "a2", "assignments", "mid_sem", "ca", "python_lab", "r_lab",
+               "exam_raw", "exam_30", "main_exam", "total_score", "grade",
+               "pass_fail")
+
+results <- read.csv("COSC_423_Results.csv", skip = 3, header = FALSE,
+                    col.names = col_names, stringsAsFactors = FALSE)
+results <- results[grepl("^CSA", results$id), ]
+results$pass_fail <- factor(results$pass_fail)
+results$gender <- factor(results$gender)
+
+head(results[, c("id", "gender", "cgpa_range", "ca", "main_exam",
+                 "total_score", "grade", "pass_fail")])
+dim(results)
+str(results[, c("id", "gender", "ca", "main_exam", "total_score", "grade")])
+```
+
+```{r missing}
+sum(is.na(results$total_score))
+```
+
+There are `r nrow(results)` students and `r sum(is.na(results$total_score))`
+missing final scores. The analysis uses `total_score` (the final mark out of
+100).
+
+# Part 2: Descriptive statistics
+
+```{r descriptives}
+scores <- results$total_score
+
+mean_score   <- mean(scores, na.rm = TRUE)
+median_score <- median(scores, na.rm = TRUE)
+mode_score   <- as.numeric(names(sort(table(scores), decreasing = TRUE)[1]))
+
+var_score   <- var(scores, na.rm = TRUE)
+sd_score    <- sd(scores, na.rm = TRUE)
+range_score <- max(scores, na.rm = TRUE) - min(scores, na.rm = TRUE)
+iq_range    <- IQR(scores, na.rm = TRUE)
+
+summary_stats <- data.frame(
+  Statistic = c("Mean", "Median", "Mode", "Variance", "Std Dev", "Range", "IQR"),
+  Value = round(c(mean_score, median_score, mode_score, var_score, sd_score,
+                  range_score, iq_range), 2)
+)
+summary_stats
+```
+
+The mean is `r round(mean_score, 1)` and the median is `r round(median_score, 1)`.
+`r if (mean_score < median_score) "The mean sits below the median, which suggests a left (negative) skew pulled down by low scorers." else "The mean sits above the median, which suggests a right (positive) skew."`
+The standard deviation of `r round(sd_score, 1)` marks a wide spread across the
+class. The mode is a weak summary here because scores are continuous and few
+values repeat.
+
+## Extension: scores by pass/fail and gender
+
+```{r groups}
+aggregate(total_score ~ pass_fail, data = results,
+          FUN = function(x) c(n = length(x), mean = round(mean(x), 1),
+                              sd = round(sd(x), 1)))
+aggregate(total_score ~ gender, data = results,
+          FUN = function(x) c(n = length(x), mean = round(mean(x), 1),
+                              sd = round(sd(x), 1)))
+```
+
+# Part 3: Distribution and normality
+
+```{r histogram}
+ggplot(results, aes(x = total_score)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_score, color = "red", linetype = "dashed",
+             linewidth = 1) +
+  geom_vline(xintercept = median_score, color = "green", linetype = "dashed",
+             linewidth = 1) +
+  labs(title = "Distribution of Total Scores",
+       subtitle = "Red = mean, green = median",
+       x = "Total Score", y = "Frequency") +
+  theme_minimal()
+```
+
+```{r qq}
+qqnorm(scores)
+qqline(scores, col = "red")
+```
+
+```{r shapiro}
+shapiro_test <- shapiro.test(scores)
+shapiro_test
+```
+
+The Shapiro-Wilk test gives W = `r round(shapiro_test$statistic, 3)` and
+p = `r format(shapiro_test$p.value, digits = 3, scientific = TRUE)`.
+`r if (shapiro_test$p.value < 0.05) "Because p < 0.05, we reject normality: the scores are not normally distributed. The histogram shows a cluster of very low scores (students who barely attended or sat the exam) alongside the main group, and the Q-Q plot departs from the line in the tails." else "Because p >= 0.05 we do not reject normality, and the Q-Q plot follows the line closely."`
+
+## Scenario reasoning: which distribution fits?
+
+* **Binomial:** A 10-question True/False quiz fits a binomial distribution
+  because each question has two outcomes, there is a fixed number of trials
+  (10), and the probability of success is constant per question.
+* **Poisson:** Daily attendance counts fit a Poisson distribution if students
+  arrive independently at a constant average rate.
+* **Normal:** Total exam scores often approximate normality through the Central
+  Limit Theorem, because many factors contribute and their sum tends toward a
+  bell curve. This class does not follow that pattern perfectly (see the test
+  above), mainly because of the students with near-zero totals.
+
+# Part 4: One-sample hypothesis test
+
+Test whether the class mean differs from a claimed value of 60.
+
+* H0: mu = 60
+* H1: mu != 60 (two-tailed), alpha = 0.05
+
+```{r ttest}
+t_test_result <- t.test(scores, mu = 60, alternative = "two.sided",
+                        conf.level = 0.95)
+t_test_result
+
+t_statistic <- t_test_result$statistic
+p_value     <- t_test_result$p.value
+ci_lower    <- t_test_result$conf.int[1]
+ci_upper    <- t_test_result$conf.int[2]
+
+cat("Test Statistic (t):", round(t_statistic, 3), "\n")
+cat("P-value:", signif(p_value, 4), "\n")
+cat("95% Confidence Interval: [", round(ci_lower, 2), ",", round(ci_upper, 2), "]\n")
+```
+
+## Interpretation
+
+We conducted a one-sample t-test to assess whether the class mean
+(`r round(mean_score, 1)`) differs significantly from the claimed mean of 60.
+The t-statistic is `r round(t_statistic, 2)` with p = `r signif(p_value, 3)`.
+At the alpha = 0.05 level we
+`r if (p_value < 0.05) "reject the null hypothesis" else "fail to reject the null hypothesis"`
+(p `r if (p_value < 0.05) "<" else ">"` 0.05). The 95% confidence interval
+[`r round(ci_lower, 1)`, `r round(ci_upper, 1)`]
+`r if (ci_lower <= 60 && 60 <= ci_upper) "contains 60, so there is insufficient evidence that the true mean differs from 60." else "does not contain 60, so the true mean differs from 60."`
+`r if (p_value < 0.05) "A Type I error is possible: we may have rejected a true null hypothesis, with probability at most 0.05." else "A Type II error is possible: our sample may have missed a real difference."`
+
+Caveat: the t-test assumes approximately normal data. The Shapiro-Wilk result
+above shows the scores are not perfectly normal, but with n =
+`r length(scores)` the Central Limit Theorem makes the test of the mean
+reasonably robust. As a non-parametric check I also ran a Wilcoxon signed-rank
+test:
+
+```{r wilcox}
+wilcox_result <- wilcox.test(scores, mu = 60)
+wilcox_result
+```
+
+The two tests give different answers (t-test p = `r signif(p_value, 3)`,
+Wilcoxon p = `r signif(wilcox_result$p.value, 3)`). This is not a
+contradiction: the t-test compares the **mean** to 60, and the mean
+(`r round(mean_score, 1)`) is pulled down by the left skew, while the Wilcoxon
+test compares the centre of the distribution, which is closer to the median
+(`r round(median_score, 1)`), and that is near 60. So the evidence that the
+typical student scores about 60 is fine, but the average is dragged below 60 by
+the group of students with near-zero totals. The conclusion about the mean
+should therefore be reported with this caveat.
+
+# Part 5: Reproducibility
+
+```{r session}
+sessionInfo()
+```
