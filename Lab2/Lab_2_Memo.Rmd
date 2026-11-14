@@ -1,0 +1,71 @@
+---
+title: "Memo: Six-Group Results Analysis"
+output:
+  html_document:
+    theme: null
+    highlight: null
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+source("lab2_analysis.R")
+fmt_p <- function(p) ifelse(p < 0.001, "p < 0.001", paste0("p = ", signif(p, 2)))
+fa <- anova_a[1, "F value"]; fs <- anova_t[1, "F value"]
+fb <- tukey_a["F-B", ]; fc <- tukey_a["F-C", ]
+```
+
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; max-width: 780px; margin: 0 auto; padding: 0 14px; }
+h1.title { font-size: 17pt; margin: 8px 0 4px; }
+h3 { font-size: 11.5pt; margin: 10px 0 3px; }
+p, li { margin: 3px 0; }
+table { border-collapse: collapse; font-size: 9.5pt; margin: 4px 0; }
+td, th { border: 1px solid #999; padding: 2px 8px; text-align: center; }
+img { max-width: 100%; }
+@page { size: A4; margin: 14mm; }
+</style>
+
+**TO:** Dean  **FROM:** Bright Joses  **DATE:** `r format(Sys.Date(), "%d %B %Y")`
+**RE:** Six-group results analysis, COSC 423 results file
+
+### Executive summary
+
+We analysed `r n_obs` students, who fall into six groups by final letter grade (A to F). Total score differs strongly across groups (F = `r round(fs, 1)`, `r fmt_p(anova_t[1, "Pr(>F)"])`), but because grades are assigned from the score, this result is built in and says little by itself. The more useful question is whether **attendance**, which does not determine grade, separates the groups. It does, but only for one group: students graded F attended far less than everyone else, while groups A to E look alike.
+
+### Key findings
+
+* **Attendance:** overall difference across groups is significant (F = `r round(fa, 1)`, `r fmt_p(anova_a[1, "Pr(>F)"])`). After Tukey correction, `r n_sig_a` of 15 pairwise comparisons are significant, and **all five involve Group F**. Group F averaged `r group_summary$attendance_mean_pct[6]`% attendance against `r group_summary$attendance_mean_pct[2]`% for Group B (difference `r round(fb["diff"], 1)` points, 95% CI [`r round(fb["lwr"], 1)`, `r round(fb["upr"], 1)`], `r fmt_p(fb["p adj"])`). No other pair differs after correction.
+* **Scores:** `r n_sig_t` of 15 pairs differ after Tukey correction; only D vs E is not significant. Group means fall steadily from `r group_summary$score_mean[1]` (A) to `r group_summary$score_mean[6]` (F).
+* **Group F is the problem group:** `r group_summary$n[6]` students (`r round(100 * group_summary$n[6] / n_obs)`%) averaged `r group_summary$score_mean[6]`, with a very wide spread (SD `r group_summary$score_sd[6]`), compared with SDs of 1 to 5 in the other groups.
+* **Missing data:** `r n_missing_cells` of `r n_obs * n_vars` cells (`r pct_missing`%) are missing, so there is nothing to impute. Some students recorded zeros (did not attend or sit assessments); these are real values, not missing data.
+
+```{r tbl, results='asis'}
+tab <- group_summary
+names(tab) <- c("Group", "n", "Score mean", "Score SD", "Score median", "Attend. mean %", "Attend. SD %")
+knitr::kable(tab, format = "html", align = "c")
+```
+
+```{r figs, fig.show='hold', out.width='49%', fig.width=5.2, fig.height=3.6}
+print(fig_score)
+print(fig_att)
+```
+
+### Implications
+
+1. Attendance is the clearest early warning sign. Low attendance is concentrated in Group F, so monitoring attendance from the first weeks could identify at-risk students before the final exam.
+2. Support is most useful for the students with near-zero attendance. Groups A to E do not differ meaningfully in attendance, so attendance alone will not separate a B student from a C student.
+3. The scores of Groups A to E are tight within group, while Group F is not; a few F students are very low (near zero), and they should be followed up individually.
+
+### Methods and checks
+
+One-way ANOVA with Tukey HSD for all 15 pairwise comparisons (family-wise alpha = 0.05). Because group variances are unequal (Levene-style test `r fmt_p(levene_t[1, "Pr(>F)"])`) and the data are not normal, I confirmed the results with Welch ANOVA (score `r fmt_p(welch_t$p.value)`; attendance `r fmt_p(welch_a$p.value)`) and Kruskal-Wallis (score `r fmt_p(kw_t$p.value)`; attendance `r fmt_p(kw_a$p.value)`); all agree. Outliers (1.5 x IQR: `r outlier_counts["total_score"]` in total score, `r outlier_counts["att_pct"]` in attendance) were **kept**, since they are real students rather than entry errors; excluding the score outliers leaves the ANOVA conclusion unchanged (F = `r round(anova_t2[1, "F value"], 1)`, still 14 of 15 pairs significant). Two CGPA ranges in the file are malformed (`r paste(bad_cgpa$id, collapse = ", ")`) and were not used in the analysis.
+
+### Limitations
+
+* **Circularity:** grade is derived from total score, so score differences between grade groups are expected by construction.
+* **Small groups:** Group A has `r group_summary$n[1]` students and Group E has `r group_summary$n[5]`, which limits precision (wide intervals for any comparison involving A).
+* **Observational data:** one cohort, one course; associations with attendance do not show that attendance causes better results.
+* **Grouping assumption:** the file has no separate group column; I used letter grade as the six groups. If a different grouping was intended, the script needs only one line changed.
+
+*Code and data: `lab2_analysis.R`, `COSC_423_Results.csv`; figures `figure_score_by_group.png` and `figure_attendance_by_group.png`; table `group_summary.csv`.*
