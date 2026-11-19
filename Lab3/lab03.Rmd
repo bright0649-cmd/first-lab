@@ -1,0 +1,370 @@
+---
+title: "Lab 3: CART for Loan Delinquency"
+author: "Bright Joses"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(rpart)
+library(rpart.plot)
+library(caTools)
+library(ggplot2)
+```
+
+# Part 1: Reproduce the CART model from the Topic 3 demonstration
+
+## Data preparation (as in the demo)
+
+```{r data}
+loandata <- read.csv("Loan_Delinquent_Dataset.csv")
+for (v in c("isDelinquent", "term", "gender", "purpose", "home_ownership", "age", "FICO"))
+  loandata[[v]] <- as.factor(loandata[[v]])
+loandata <- loandata[, -1]                                   # drop ID
+levels(loandata$purpose) <- c("Car", "House", "Medical", "Other", "Other",
+                              "Personal", "Wedding")          # merge 'Other'/'other'
+
+set.seed(1000)                                                # same seed as the demo
+sample <- sample.split(loandata$isDelinquent, SplitRatio = 0.7)
+train <- subset(loandata, sample == TRUE)
+test  <- subset(loandata, sample == FALSE)
+c(train = nrow(train), test = nrow(test))
+prop.table(table(train$isDelinquent))
+```
+
+The positive class throughout is **isDelinquent = 1**. A *false negative* is a
+delinquent borrower the model lets through (predicts 0); a *false positive* is
+a good borrower the model flags (predicts 1).
+
+## The demo's CART model (Model 2)
+
+```{r demo-model}
+r.ctrl2 <- rpart.control(minsplit = 500, minbucket = 150, cp = 0, xval = 10)
+model2 <- rpart(isDelinquent ~ ., data = train, method = "class", control = r.ctrl2)
+model2
+rpart.plot(model2, type = 4, extra = 104, main = "Demo CART (Model 2)")
+```
+
+## A deliberately over-grown tree
+
+The demo's tree has few leaves because the controls (`minsplit = 500`) stop it
+early. To see what pruning does, I also grow a maximal tree (every split
+allowed, `cp = -1`) and prune it back in Part 2.
+
+```{r full-tree}
+set.seed(1000)
+full <- rpart(isDelinquent ~ ., data = train, method = "class",
+              control = rpart.control(minsplit = 2, minbucket = 1, cp = -1, xval = 10))
+n_leaves <- function(m) sum(m$frame$var == "<leaf>")
+n_leaves(full)
+```
+
+# Part 2: Prune using the cross-validated results
+
+```{r printcp}
+printcp(full)
+```
+
+```{r plotcp}
+plotcp(full)
+```
+
+```{r choose-cp}
+tb <- full$cptable
+best_row <- which.min(tb[, "xerror"])
+best_cp  <- tb[best_row, "CP"]
+one_se   <- tb[best_row, "xerror"] + tb[best_row, "xstd"]
+row_1se  <- min(which(tb[, "xerror"] <= one_se))
+c(best_row = best_row, best_cp = best_cp, nsplit = tb[best_row, "nsplit"],
+  min_xerror = tb[best_row, "xerror"], row_1se = row_1se)
+
+pruned <- prune(full, cp = best_cp)
+n_leaves(pruned)
+rpart.plot(pruned, type = 4, extra = 104, main = "Pruned tree")
+```
+
+**Chosen cp = `r format(best_cp, scientific = FALSE, digits = 2)`.** The cross-validated error (`xerror`)
+falls from 1.00 with no splits to `r round(tb[best_row, "xerror"], 3)` at
+`r tb[best_row, "nsplit"]` splits, then stops improving and creeps back up
+(`r round(tb[best_row + 1, "xerror"], 3)`) as more splits are allowed. I took
+the row with the lowest `xerror`; the one-standard-error rule picks the same
+row (row `r row_1se`), so there is no ambiguity. Pruning at this cp shrinks the
+tree from `r n_leaves(full)` leaves to `r n_leaves(pruned)`, and any cp between
+`r format(best_cp, scientific = FALSE, digits = 2)` and `r format(tb[best_row - 1, "CP"], digits = 2)` gives the same
+tree. It uses only `FICO`, `gender`, `age` and `term`; `purpose` and
+`home_ownership` never help.
+
+# Part 3: Evaluate the pruned tree on the test data
+
+```{r eval}
+p_test  <- predict(pruned, test)[, "1"]          # P(delinquent)
+actual  <- test$isDelinquent
+make_tab <- function(p, cutoff) {
+  pred <- factor(as.integer(p > cutoff), levels = 0:1)
+  table(Actual = factor(actual, levels = 0:1), Predicted = pred)
+}
+metrics <- function(tab) {
+  c(accuracy    = sum(diag(tab)) / sum(tab),
+    sensitivity = tab["1", "1"] / sum(tab["1", ]),   # delinquents caught
+    specificity = tab["0", "0"] / sum(tab["0", ]))   # good borrowers passed
+}
+
+tab50 <- make_tab(p_test, 0.5)
+tab50
+round(metrics(tab50), 4)
+```
+
+Sensitivity is the share of delinquent borrowers the tree flags; specificity is
+the share of good borrowers it correctly lets through.
+
+## ROC curve and AUC
+
+```{r roc}
+roc_at <- function(cutoff) {
+  tab <- make_tab(p_test, cutoff)
+  c(cutoff = cutoff, TPR = tab["1", "1"] / sum(tab["1", ]),
+    FPR = tab["0", "1"] / sum(tab["0", ]))
+}
+cuts <- c(-Inf, sort(unique(p_test)), Inf)
+roc <- as.data.frame(t(sapply(cuts, function(ct) {
+  pred <- as.integer(p_test >= ct)             # flag everyone at or above the score
+  c(cutoff = ct,
+    TPR = sum(pred == 1 & actual == 1) / sum(actual == 1),
+    FPR = sum(pred == 1 & actual == 0) / sum(actual == 0))
+})))
+roc <- roc[order(roc$FPR, roc$TPR), ]
+
+# AUC = P(random delinquent scores higher than random good borrower), ties = 1/2
+auc <- function(score, y) {
+  r <- rank(score); n1 <- sum(y == 1); n0 <- sum(y == 0)
+  (sum(r[y == 1]) - n1 * (n1 + 1) / 2) / (n1 * n0)
+}
+AUC <- auc(p_test, as.integer(as.character(actual)))
+AUC
+n_distinct_scores <- length(unique(p_test))
+
+r50 <- roc_at(0.5); r16 <- roc_at(1/6)
+pt <- data.frame(label = c("cutoff 0.50", "cutoff 1/6"),
+                 TPR = c(r50[["TPR"]], r16[["TPR"]]),
+                 FPR = c(r50[["FPR"]], r16[["FPR"]]))
+ggplot(roc, aes(FPR, TPR)) +
+  geom_abline(linetype = "dashed", colour = "grey50") +
+  geom_step(colour = "steelblue", linewidth = 1, direction = "vh") +
+  geom_point(data = roc, colour = "steelblue", size = 2) +
+  geom_point(data = pt, aes(colour = label), size = 4) +
+  labs(title = paste0("ROC curve, pruned tree (AUC = ", round(AUC, 3), ")"),
+       x = "False positive rate (1 - specificity)",
+       y = "True positive rate (sensitivity)", colour = "") +
+  theme_minimal()
+```
+
+# Part 4: Business-rule memo
+
+```{r rules}
+rpart.rules(pruned, cover = TRUE)
+```
+
+> **Memo to loan officers** (rules from the pruned tree; share of past loans in
+> brackets)
+>
+> 1. FICO 500 or below, 36-month term: **decline**. 90% went delinquent [52%].
+> 2. FICO 500 or below, 60-month term: approve. None went delinquent [3%].
+> 3. FICO above 500, female: approve. 23% delinquent [21%].
+> 4. FICO above 500, male: a 36-month loan is risky if over 25 (79% delinquent)
+>    but acceptable at 20-25 (30%). A 60-month loan is risky at 20-25 (85%) and
+>    safe over 25 (none).
+>
+> **Caution:** the 60-month results are surprising, so check them. Gender and
+> age drive rules 3 and 4, and lending law in many places forbids using them, so
+> get legal review before use.
+
+```{r memo-words, echo=FALSE}
+memo <- "Memo to loan officers (rules from the pruned tree; share of past loans in brackets) 1. FICO 500 or below, 36-month term: decline. 90% went delinquent [52%]. 2. FICO 500 or below, 60-month term: approve. None went delinquent [3%]. 3. FICO above 500, female: approve. 23% delinquent [21%]. 4. FICO above 500, male: a 36-month loan is risky if over 25 (79% delinquent) but acceptable at 20-25 (30%). A 60-month loan is risky at 20-25 (85%) and safe over 25 (none). Caution: the 60-month results are surprising, so check them. Gender and age drive rules 3 and 4, and lending law in many places forbids using them, so get legal review before use."
+word_count <- lengths(strsplit(memo, "\\s+"))
+```
+
+*Memo length: `r word_count` words (limit 150).*
+
+# Written answers
+
+## 1. What do the errors cost?
+
+At the 0.5 cutoff the test set has **`r tab50["1", "0"]` false negatives** and
+**`r tab50["0", "1"]` false positives**.
+
+* **False negative (a delinquent borrower approved):** the lender loses the
+  unrecovered principal and the cost of collections, and the loan adds to bad
+  debt. The borrower is also harmed, because they take on debt they cannot repay.
+* **False positive (a good borrower declined):** the borrower loses a loan they
+  would have repaid, such as a house, car or medical need, and may turn to
+  worse credit. The lender loses the interest and fee income that loan would
+  have earned.
+
+I would rather reduce **false negatives**. One missed delinquency usually costs
+the lender a large part of the principal, while a wrongly declined loan costs
+only the margin, so in money terms a false negative is the more expensive error.
+The price is more false positives, so how far to push depends on the cost ratio
+(next question). Declining good borrowers also has a fairness cost, so it
+should not be ignored.
+
+## 2. If a miss costs five times a wrong decline
+
+Approving a borrower with delinquency probability $p$ has expected cost
+$5p$ (a miss); declining has expected cost $1\times(1-p)$ (a wrong decline).
+Decline whenever $5p > 1-p$, that is $p > 1/6 \approx 0.167$. In general the
+threshold is $C_{FP}/(C_{FP}+C_{FN}) = 1/(1+5)$.
+
+```{r threshold}
+tab_c <- make_tab(p_test, 1/6)
+tab_c
+cmp <- rbind(`cutoff 0.50` = metrics(tab50), `cutoff 1/6` = metrics(tab_c))
+cost <- function(tab) 5 * tab["1", "0"] + 1 * tab["0", "1"]
+cmp <- cbind(round(cmp, 4), FN = c(tab50["1", "0"], tab_c["1", "0"]),
+             FP = c(tab50["0", "1"], tab_c["0", "1"]),
+             total_cost = c(cost(tab50), cost(tab_c)))
+cmp
+```
+
+At the 1/6 cutoff sensitivity moves from
+`r round(metrics(tab50)["sensitivity"], 3)` to
+`r round(metrics(tab_c)["sensitivity"], 3)` and specificity from
+`r round(metrics(tab50)["specificity"], 3)` to
+`r round(metrics(tab_c)["specificity"], 3)`. The total cost (in units of one
+wrongly declined loan) goes from `r cost(tab50)` to `r cost(tab_c)`, a change
+of `r round(100 * (cost(tab_c) - cost(tab50)) / cost(tab50), 1)`%. The tree has
+only `r n_distinct_scores` distinct scores, so moving the cutoff from 0.5 to
+1/6 changes which leaves are flagged, and changes accuracy
+(`r round(metrics(tab50)["accuracy"], 3)` to
+`r round(metrics(tab_c)["accuracy"], 3)`), but it cannot change anything in
+between.
+
+## 3. What does the ROC curve show?
+
+A confusion matrix is one point: it fixes a single cutoff. The ROC curve shows
+sensitivity against the false-positive rate at **every** cutoff, so it shows
+the whole trade-off and lets you choose a cutoff after the costs are known. It
+also does not depend on class balance.
+
+**AUC = `r round(AUC, 3)`.** As a probability: if I pick one delinquent and one
+non-delinquent borrower at random from the test set, there is a
+`r round(100 * AUC, 1)`% chance the tree gives the delinquent borrower the
+higher risk score (ties count half). 0.5 is a coin flip and 1 is perfect.
+
+A tree gives so few points because every borrower who lands in the same leaf
+gets the same score (the leaf's class proportion). This tree has
+`r n_leaves(pruned)` leaves but only `r n_distinct_scores` distinct scores, so
+the ROC curve has only `r n_distinct_scores + 1` corners instead of a smooth
+curve. Many ties also mean the tree cannot rank borrowers inside a leaf.
+
+## 4. Full tree vs pruned tree
+
+```{r gap}
+acc <- function(m, dat) mean(predict(m, dat, type = "class") == dat$isDelinquent)
+gap <- data.frame(
+  Tree = c("Full (maximal)", "Pruned"),
+  Leaves = c(n_leaves(full), n_leaves(pruned)),
+  Train_accuracy = round(c(acc(full, train), acc(pruned, train)), 4),
+  Test_accuracy = round(c(acc(full, test), acc(pruned, test)), 4))
+gap$Gap_train_minus_test <- gap$Train_accuracy - gap$Test_accuracy
+gap
+```
+
+The full tree has `r n_leaves(full)` leaves and scores
+`r round(100 * acc(full, train), 2)`% on training data against
+`r round(100 * acc(full, test), 2)`% on test data, a gap of
+`r round(100 * (acc(full, train) - acc(full, test)), 2)` points. The pruned tree
+has `r n_leaves(pruned)` leaves and scores
+`r round(100 * acc(pruned, train), 2)`% against
+`r round(100 * acc(pruned, test), 2)`%, a gap of
+`r round(100 * (acc(pruned, train) - acc(pruned, test)), 2)` points. So here
+pruning removes `r n_leaves(full) - n_leaves(pruned)` leaves without losing
+accuracy. The gap is small in both cases because the data has only six
+categorical predictors with few distinct combinations, so there is little
+noise for a tree to memorise. The over-grown tree is still not better, only
+bigger and harder to explain.
+
+**What cp controls:** `cp` is the complexity penalty. A split is kept only if
+it lowers the tree's error by at least `cp` times the root error, so a larger
+cp gives a smaller tree, and `cp = 0` allows any split. **What `xerror` says:**
+it is the 10-fold cross-validated error, relative to the root (one-leaf)
+tree, so `r round(tb[best_row, "xerror"], 3)` means the tree makes
+`r round(100 * tb[best_row, "xerror"], 1)`% as many mistakes as always guessing
+the majority class. `xstd` is its standard error. The `xerror` falls until
+about `r tb[best_row, "nsplit"]` splits and then flattens and rises, which is
+the sign that further splits only fit noise, and I prune where it is lowest.
+
+## 5. Instability: would the rules change on different data?
+
+I refit the whole procedure (grow the maximal tree, choose cp by cross-validated
+error, prune) on 100 bootstrap resamples of the training data, and on 100
+random samples of only 1,000 loans.
+
+```{r stability, cache=TRUE}
+refit <- function(dat) {
+  m <- rpart(isDelinquent ~ ., data = dat, method = "class",
+             control = rpart.control(minsplit = 2, minbucket = 1, cp = -1, xval = 10))
+  t <- m$cptable
+  p <- prune(m, cp = t[which.min(t[, "xerror"]), "CP"])
+  vars <- sort(unique(as.character(p$frame$var[p$frame$var != "<leaf>"])))
+  list(root = as.character(p$frame$var[1]),
+       vars = paste(vars, collapse = "+"),
+       leaves = sum(p$frame$var == "<leaf>"),
+       test_acc = mean(predict(p, test, type = "class") == test$isDelinquent))
+}
+summarise_runs <- function(res) {
+  data.frame(
+    root_FICO_pct = 100 * mean(sapply(res, `[[`, "root") == "FICO"),
+    same_4_vars_pct = 100 * mean(sapply(res, `[[`, "vars") == "age+FICO+gender+term"),
+    core_always_pct = 100 * mean(grepl("age", sapply(res, `[[`, "vars")) &
+                                 grepl("FICO", sapply(res, `[[`, "vars")) &
+                                 grepl("gender", sapply(res, `[[`, "vars")) &
+                                 grepl("term", sapply(res, `[[`, "vars"))),
+    distinct_variable_sets = length(unique(sapply(res, `[[`, "vars"))),
+    exactly_7_leaves_pct = 100 * mean(sapply(res, `[[`, "leaves") == 7),
+    leaves_min = min(sapply(res, `[[`, "leaves")),
+    leaves_max = max(sapply(res, `[[`, "leaves")),
+    test_acc_min = round(min(sapply(res, `[[`, "test_acc")), 3),
+    test_acc_max = round(max(sapply(res, `[[`, "test_acc")), 3))
+}
+set.seed(2026)
+boot <- lapply(1:100, function(i) refit(train[sample(nrow(train), replace = TRUE), ]))
+small <- lapply(1:100, function(i) refit(train[sample(nrow(train), 1000), ]))
+stab <- rbind(`Bootstrap (n = 8084)` = summarise_runs(boot),
+              `Small samples (n = 1000)` = summarise_runs(small))
+stab
+table(Variables_used = sapply(small, `[[`, "vars"))
+```
+
+The top of the tree is stable. `FICO` is the root split in
+`r stab[1, "root_FICO_pct"]`% of bootstrap runs and `r stab[2, "root_FICO_pct"]`%
+of small-sample runs, and `FICO`, `gender`, `age` and `term` were all used in
+`r stab[1, "core_always_pct"]`% and `r stab[2, "core_always_pct"]`% of runs.
+
+The detail is not stable. Only `r stab[1, "same_4_vars_pct"]`% of bootstrap runs
+and `r stab[2, "same_4_vars_pct"]`% of small-sample runs use exactly those four
+variables; in the others, `purpose` and/or `home_ownership` also enter the tree
+(`r stab[2, "distinct_variable_sets"]` different variable sets in the small
+samples). The pruned tree has exactly 7 leaves, like mine, in only
+`r stab[1, "exactly_7_leaves_pct"]`% of bootstrap runs and
+`r stab[2, "exactly_7_leaves_pct"]`% of small-sample runs, and its size ranges
+from `r stab[1, "leaves_min"]` to `r stab[1, "leaves_max"]` leaves (bootstrap)
+and `r stab[2, "leaves_min"]` to `r stab[2, "leaves_max"]` (small samples), so
+the deeper rules are different in different samples. Test accuracy barely
+moves (`r stab[1, "test_acc_min"]` to `r stab[1, "test_acc_max"]` for the
+bootstrap; `r stab[2, "test_acc_min"]` to `r stab[2, "test_acc_max"]` for small
+samples), so the *predictions* are stable even where the *rules* are not. This
+is the usual instability of trees: small changes in the data change which weak
+splits win, even when overall performance does not change.
+
+This matters before a lender adopts the memo because the memo is a list of
+rules, and a rule that depends on the particular sample may not hold on next
+year's loans. I would adopt the top-level rules (`FICO`, then `term`) with
+more confidence than the deeper ones, check the 60-month results on a fresh
+sample from a later period before relying on them, and report the rules with
+their uncertainty. If stability matters more than readability, an ensemble such
+as a random forest would be steadier but is harder to hand to a loan officer.
+Gender and age also need legal review whatever the data shows.
