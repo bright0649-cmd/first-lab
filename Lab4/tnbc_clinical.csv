@@ -1,0 +1,191 @@
+PATIENT ID,AGE_AT_DIAGNOSIS,BREAST_SURGERY,CANCER_TYPE,CANCER_TYPE_DETAILED,CELLULARITY,CHEMOTHERAPY,RADIO_THERAPY,HORMONE_THERAPY,CLAUDIN_SUBTYPE,COHORT,ER_IHC,ER_STATUS,PR_STATUS,HER2_STATUS,GRADE,HER2_SNP6,MUTATION_COUNT,HISTOLOGICAL_SUBTYPE,INFERRED_MENOPAUSAL_STATE,INTCLUST,LATERALITY,NPI,ONCOTREE_CODE,OS_MONTHS,SAMPLE_TYPE,THREEGENE,TUMOR_SIZE,TUMOR_STAGE,VITAL_STATUS
+MB.0020,70,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,Normal,1,neg,-,-,-,3,NEUT,0,ILC,post,4ER-,l,6.13,BRCA,22.4,Primary,ER-/HER2-,65,3,Died of Disease
+MB.0062,52.14,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,3,IDC-MED,post,10,r,4.034,BRCA,153.9666667,Primary,NA,17,1,Living
+MB.0079,50.42,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Her2,1,neg,-,-,-,3,NEUT,4,IDC,post,10,r,6.08,IDC,28.5,Primary,NA,40,2,Died of Disease
+MB.0100,68.68,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,1,IDC,post,10,r,4.078,IDC,8.066666667,Primary,ER-/HER2-,39,2,Died of Disease
+MB.0115,39.84,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,4.05,IDC,66.73333333,Primary,ER-/HER2-,25,2,Died of Disease
+MB.0127,52.11,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,NA,YES,YES,YES,Normal,1,pos,-,-,-,2,NEUT,5,IDC,post,3,r,4.026,IDC,132.0666667,Primary,ER+/HER2- Low Prolif,13,2,Living
+MB.0157,71.5,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,1,IDC,post,4ER-,l,4.06,IDC,114.7666667,Primary,ER-/HER2-,30,2,Living
+MB.0164,37.87,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,4,IDC,pre,10,l,4.032,IDC,10.83333333,Primary,ER-/HER2-,16,2,Living
+MB.0174,59.18,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,2,IDC,post,4ER-,l,4.048,IDC,78.76666667,Primary,ER-/HER2-,24,2,Living
+MB.0179,56.39,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,claudin-low,1,neg,-,-,-,3,GAIN,0,IDC,post,4ER-,r,6.068,IDC,17.93333333,Primary,ER-/HER2-,34,3,Died of Disease
+MB.0188,82.65,MASTECTOMY,Breast Cancer,Breast Invasive Lobular Carcinoma,high,YES,YES,NO,Her2,1,pos,-,-,-,2,NEUT,7,ILC,post,3,r,4.09,ILC,31.3,Primary,NA,45,2,Died of Disease
+MB.0200,69.86,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,1,neg,-,-,-,3,NEUT,1,IDC,post,10,r,4.076,IDC,128.7,Primary,NA,38,2,Died of Disease
+MB.0206,55.02,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,7,IDC-MED,post,10,l,5.07,BRCA,141.1666667,Primary,ER-/HER2-,35,2,Living
+MB.0210,63.14,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,NA,NO,YES,YES,claudin-low,1,pos,-,-,-,2,NEUT,0,IDC,post,4ER+,l,5.01,BRCA,144.9333333,Primary,NA,5,3,Living
+MB.0214,41.41,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,pos,-,-,-,3,NEUT,4,IDC,pre,10,l,4.054,IDC,146.9,Primary,ER-/HER2-,27,2,Living
+MB.0238,52.19,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,1,IDC,post,10,r,6.07,IDC,193.1666667,Primary,ER-/HER2-,35,2,Living
+MB.0249,53.45,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Her2,1,neg,-,-,-,3,GAIN,2,IDC,post,10,r,4.022,IDC,188.3333333,Primary,ER-/HER2-,11,1,Living
+MB.0265,46.44,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,claudin-low,1,pos,-,-,-,2,NEUT,2,IDC,pre,4ER+,r,4.042,IDC,189.1333333,Primary,ER-/HER2-,21,2,Living
+MB.0269,45.39,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,1,IDC,pre,4ER-,r,5.052,IDC,22.23333333,Primary,ER-/HER2-,26,2,Living
+MB.0294,46.17,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,Normal,1,pos,-,-,-,2,GAIN,2,IDC,pre,4ER+,l,3.028,IDC,72.9,Primary,HER2+,14,2,Living
+MB.0299,68.83,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,NO,YES,NO,Basal,1,NA,-,-,-,NA,NEUT,0,DCIS,post,10,l,1.05,BRCA,188.1333333,Primary,ER-/HER2-,25,0,Living
+MB.0316,50.82,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,1,neg,-,-,-,3,NEUT,4,IDC,post,10,l,4.06,IDC,182.9,Primary,ER-/HER2-,30,2,Living
+MB.0340,79.97,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Basal,1,pos,-,-,-,3,NEUT,4,IDC,post,10,r,5.032,IDC,164.7333333,Primary,ER-/HER2-,16,2,Living
+MB.0352,61.32,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,claudin-low,1,pos,-,-,-,3,NEUT,5,IDC,post,4ER+,l,4.026,IDC,55.2,Primary,ER-/HER2-,13,1,Died of Disease
+MB.0372,39.86,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,1,neg,-,-,-,3,NEUT,1,IDC,pre,10,r,4.036,IDC,62.76666667,Primary,ER-/HER2-,18,1,Died of Disease
+MB.0396,56.45,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,6,IDC,post,10,l,4.054,IDC,60.66666667,Primary,ER-/HER2-,27,2,Living
+MB.0401,48.58,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,2,IDC,pre,10,r,4.04,IDC,26.26666667,Primary,ER-/HER2-,20,1,Died of Disease
+MB.0414,72.16,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,NO,claudin-low,1,neg,-,-,-,3,LOSS,7,IDC,post,10,l,4.042,IDC,76.63333333,Primary,ER-/HER2-,21,2,Living
+MB.0420,34.92,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,3,IDC,pre,10,l,4.032,IDC,76.73333333,Primary,ER-/HER2-,16,1,Living
+MB.0424,44.02,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,0,IDC,pre,4ER-,l,6.12,IDC,9.833333333,Primary,ER-/HER2-,60,3,Died of Disease
+MB.0453,61.11,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,Her2,1,pos,-,-,-,3,LOSS,4,IDC,post,2,r,6.2,IDC,43.13333333,Primary,ER+/HER2- High Prolif,100,3,Died of Disease
+MB.0464,58.98,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,Basal,1,neg,-,-,-,3,LOSS,2,IDC,post,9,r,6.026,IDC,39.3,Primary,ER-/HER2-,13,3,Died of Disease
+MB.0470,61.78,BREAST CONSERVING,Breast Cancer,Breast Invasive Lobular Carcinoma,NA,NO,YES,YES,claudin-low,1,pos,-,-,-,1,LOSS,4,ILC,post,4ER+,l,2.03,ILC,88.23333333,Primary,NA,15,1,Living
+MB.0481,54.22,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,2,IDC,post,10,l,4.038,IDC,36.4,Primary,ER-/HER2-,19,1,Died of Disease
+MB.0494,77.22,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,1,neg,-,-,-,3,NEUT,2,IDC,post,4ER-,l,6.08,IDC,36.63333333,Primary,ER-/HER2-,40,3,Died of Disease
+MB.0495,63.19,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,YES,claudin-low,1,pos,-,-,-,3,NEUT,2,IDC,post,4ER+,r,6.038,IDC,71.8,Primary,ER-/HER2-,19,2,Died of Disease
+MB.0500,36.56,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,pos,-,-,-,3,NEUT,1,IDC,pre,10,r,4.044,IDC,67.46666667,Primary,ER-/HER2-,22,2,Living
+MB.0502,56.41,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,YES,claudin-low,1,pos,-,-,-,3,NEUT,0,IDC,post,4ER+,l,6.06,IDC,82.1,Primary,ER-/HER2-,30,2,Living
+MB.0516,62.81,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,3,IDC,post,10,r,4.03,IDC,114.4666667,Primary,ER-/HER2-,15,1,Living
+MB.0525,48.47,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,6,IDC,pre,4ER-,r,4.05,IDC,65.86666667,Primary,ER-/HER2-,25,2,Living
+MB.0540,66.11,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,claudin-low,1,pos,-,-,-,1,NEUT,0,IDC,post,4ER+,l,2.024,IDC,194.5333333,Primary,ER-/HER2-,12,1,Living
+MB.0581,96.29,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,1,neg,-,-,-,3,NEUT,5,IDC,post,7,r,6.052,IDC,7.866666667,Primary,ER-/HER2-,26,2,Died of Disease
+MB.0613,60.2,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,moderate,YES,YES,NO,claudin-low,1,neg,-,-,-,2,NEUT,3,IDC-MED,post,4ER-,r,3.12,BRCA,48.8,Primary,ER-/HER2-,60,3,Living
+MB.0639,50.39,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,3,IDC,post,10,l,4.036,IDC,75.4,Primary,NA,18,1,Living
+MB.0653,69.95,BREAST CONSERVING,Breast Cancer,Breast Mixed Ductal and Lobular Carcinoma,moderate,NO,YES,YES,Her2,1,pos,-,-,-,3,NEUT,22,IDC+ILC,post,9,l,5.056,MDLC,24.8,Primary,ER+/HER2- High Prolif,28,2,Died of Disease
+MB.0658,60.89,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,claudin-low,1,neg,-,-,-,3,LOSS,3,IDC,post,10,l,5.05,IDC,97.26666667,Primary,ER-/HER2-,25,2,Living
+MB.0659,82.87,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,moderate,NO,YES,NO,Normal,1,neg,-,-,-,2,NEUT,2,OTHER,post,4ER-,l,3.09,BRCA,23.33333333,Primary,ER-/HER2-,45,NA,Died of Disease
+MB.0660,52.43,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,YES,Her2,1,pos,-,-,-,3,GAIN,5,IDC-MED,post,10,r,6.32,BRCA,18.93333333,Primary,ER+/HER2- High Prolif,160,1,Died of Disease
+MB.0664,78.27,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,7,IDC,post,10,l,6.168,IDC,11.06666667,Primary,ER-/HER2-,84,3,Died of Disease
+MB.0874,59.22,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,2,IDC,post,10,l,4.078,IDC,16.6,Primary,ER-/HER2-,39,2,Died of Disease
+MB.0893,57.41,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,claudin-low,1,pos,-,-,-,3,NEUT,0,IDC,post,4ER+,l,5.056,IDC,175.6333333,Primary,ER-/HER2-,28,2,Living
+MB.0901,68.19,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,1,neg,-,-,-,3,NEUT,3,IDC,post,10,l,5.066,IDC,136.1666667,Primary,NA,33,2,Living
+MB.2643,34.2,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,NO,claudin-low,2,NA,-,-,-,2,NEUT,2,IDC,pre,4ER-,r,3.006,IDC,52.96666667,Primary,NA,3,1,Died of Disease
+MB.2753,30.95,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,GAIN,6,IDC,pre,10,l,5.074,IDC,274.4,Primary,ER-/HER2-,37,2,Living
+MB.2771,56.79,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,YES,Basal,2,pos,-,-,-,3,LOSS,7,IDC,post,10,l,4.032,IDC,44.83333333,Primary,NA,16,1,Died of Disease
+MB.2827,36.5,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,4,IDC,pre,10,r,5.022,IDC,235.6666667,Primary,ER-/HER2-,11,2,Living
+MB.2833,42.9,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC,pre,10,r,5.046,IDC,259.7666667,Primary,NA,23,2,Living
+MB.2842,58.48,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,11,IDC,post,9,r,5.054,IDC,19.73333333,Primary,ER-/HER2-,27,2,Died of Disease
+MB.2849,60.65,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,Basal,2,neg,-,-,-,3,NEUT,4,IDC,post,9,r,4.052,IDC,43.2,Primary,ER-/HER2-,26,1,Died of Disease
+MB.2850,31.48,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC,pre,10,r,6.062,IDC,9.433333333,Primary,NA,31,3,Died of Disease
+MB.2857,45.3,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,5.044,IDC,250.6666667,Primary,ER-/HER2-,22,2,Living
+MB.2904,34.83,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,6,IDC,pre,10,l,5.05,IDC,125.6,Primary,NA,25,2,Died of Disease
+MB.2912,59.6,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,5,IDC,post,10,r,6.04,IDC,267.4,Primary,ER-/HER2-,20,3,Living
+MB.2917,33.9,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,4,IDC,pre,10,l,5.06,IDC,31.93333333,Primary,ER-/HER2-,30,2,Died of Disease
+MB.2922,45.74,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Her2,2,neg,-,-,-,3,GAIN,8,IDC,pre,1,r,6.05,IDC,14.4,Primary,ER+/HER2- High Prolif,25,3,Died of Disease
+MB.2957,31.02,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,4,IDC,pre,10,l,5.06,IDC,262.1333333,Primary,ER-/HER2-,30,2,Living
+MB.2963,53.99,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,moderate,NO,YES,YES,claudin-low,2,pos,-,-,-,2,NEUT,5,IDC-TUB,post,4ER+,l,5.02,BRCA,227.8333333,Primary,ER-/HER2-,10,3,Died of Disease
+MB.2993,63.65,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,YES,claudin-low,2,neg,-,-,-,3,NEUT,4,IDC,post,10,r,4.04,IDC,187.0333333,Primary,ER-/HER2-,20,1,Living
+MB.3001,50.45,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,2,neg,-,-,-,3,LOSS,7,IDC,post,10,l,5.024,IDC,263.2333333,Primary,NA,12,2,Living
+MB.3014,39.7,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,5,IDC,pre,1,l,5.03,IDC,262.6333333,Primary,ER-/HER2-,15,2,Living
+MB.3057,55.3,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,5,IDC,post,10,r,5.086,IDC,32.03333333,Primary,ER-/HER2-,43,2,Died of Disease
+MB.3058,47.74,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,8,IDC,pre,4ER-,r,5.08,IDC,254.2666667,Primary,ER-/HER2-,40,2,Living
+MB.3062,62.87,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,NA,NO,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC,post,10,l,4.034,IDC,146.3666667,Primary,ER-/HER2-,17,1,Living
+MB.3063,43.51,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,13,IDC,pre,10,r,6.04,IDC,28.56666667,Primary,ER-/HER2-,20,3,Died of Disease
+MB.3067,60.29,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC-MED,post,9,r,5.036,BRCA,259.5333333,Primary,ER-/HER2-,18,2,Living
+MB.3123,50.26,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,2,neg,-,-,-,3,GAIN,5,IDC,post,9,r,6.044,IDC,167.4333333,Primary,ER-/HER2-,22,3,Living
+MB.3153,42.17,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,NA,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,4,IDC,pre,10,r,5.032,IDC,227.9333333,Primary,ER-/HER2-,16,2,Living
+MB.3211,58.31,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Basal,2,neg,-,-,-,3,NEUT,9,IDC,post,10,r,4.026,IDC,145.5,Primary,ER-/HER2-,13,1,Living
+MB.3218,44.94,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,3,IDC,pre,10,l,5.034,IDC,248.7666667,Primary,NA,17,2,Living
+MB.3277,29.92,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,6,IDC,pre,1,l,5.06,IDC,32.93333333,Primary,ER-/HER2-,30,2,Died of Disease
+MB.3297,42.72,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,14,IDC,pre,10,l,5.05,IDC,236.0666667,Primary,ER-/HER2-,25,2,Living
+MB.3383,38.49,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,8,IDC,pre,10,l,6.056,IDC,23.2,Primary,NA,28,3,Died of Disease
+MB.3396,59.29,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,12,IDC,post,3,r,5.05,IDC,226.7333333,Primary,ER-/HER2-,25,2,Living
+MB.3453,51.36,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,14,IDC,post,10,r,5.07,IDC,32.83333333,Primary,ER-/HER2-,35,2,Died of Disease
+MB.3502,50.79,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,2,neg,-,-,-,3,NEUT,4,IDC,post,10,l,5.054,IDC,229.3333333,Primary,ER-/HER2-,27,2,Living
+MB.3567,55.95,MASTECTOMY,Breast Cancer,Breast Mixed Ductal and Lobular Carcinoma,high,YES,YES,YES,claudin-low,2,neg,-,-,-,3,NEUT,4,IDC+ILC,post,1,l,4.05,MDLC,236.0333333,Primary,ER-/HER2-,25,2,Living
+MB.3702,37.16,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,2,neg,-,-,-,3,NEUT,5,IDC,pre,10,r,5.011,IDC,230.4666667,Primary,ER-/HER2-,5.5,2,Living
+MB.3706,55.71,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,2,neg,-,-,-,3,NEUT,4,IDC,post,10,r,4.036,IDC,38.8,Primary,ER-/HER2-,18,1,Died of Disease
+MB.3752,49.98,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,NO,YES,NO,claudin-low,2,neg,-,-,-,3,LOSS,4,IDC-MED,pre,4ER-,l,4.03,BRCA,75.33333333,Primary,ER-/HER2-,15,1,Died of Disease
+MB.4024,56.14,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Basal,3,neg,-,-,-,3,LOSS,7,IDC,post,1,l,4.05,IDC,124.1,Primary,NA,25,2,Living
+MB.4146,43.06,MASTECTOMY,Breast Cancer,Breast Invasive Lobular Carcinoma,moderate,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,5,ILC,pre,4ER-,l,6.04,ILC,15.63333333,Primary,ER-/HER2-,20,2,Died of Disease
+MB.4332,34.36,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,high,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,4,IDC-MED,pre,10,l,4.04,BRCA,307.9333333,Primary,NA,20,1,Living
+MB.4351,70.27,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Her2,3,pos,-,-,-,3,NEUT,9,IDC,post,1,r,4.04,IDC,68.13333333,Primary,NA,20,1,Died of Disease
+MB.4354,55.01,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,Her2,3,pos,-,-,-,2,NEUT,2,IDC,post,1,l,4.07,IDC,15.36666667,Primary,NA,35,NA,Died of Disease
+MB.4407,44.4,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,6,IDC,pre,10,l,4.02,IDC,83.36666667,Primary,NA,10,1,Died of Disease
+MB.4416,44.89,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,moderate,YES,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,4,IDC-MED,pre,4ER-,r,5.05,BRCA,241.6,Primary,NA,25,2,Died of Disease
+MB.4640,61.59,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Her2,3,neg,-,-,-,3,GAIN,6,IDC,post,7,r,4.05,IDC,200.6,Primary,ER+/HER2- High Prolif,25,2,Living
+MB.4660,37.53,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,9,IDC,pre,9,r,6.056,IDC,39.86666667,Primary,NA,28,2,Died of Disease
+MB.4707,59.85,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,12,IDC,post,10,r,4.054,IDC,221.2,Primary,ER-/HER2-,27,2,Living
+MB.4732,26.72,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,3,IDC,pre,10,l,5.09,IDC,149.8666667,Primary,ER-/HER2-,45,2,Living
+MB.4733,56.27,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,claudin-low,3,neg,-,-,-,3,NEUT,6,IDC,post,4ER-,l,6.036,IDC,19.73333333,Primary,ER-/HER2-,18,2,Died of Disease
+MB.4758,45.77,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,7,IDC,pre,10,r,4.02,IDC,211.9333333,Primary,ER-/HER2-,10,NA,Living
+MB.4769,65.86,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,11,IDC,post,1,l,4.07,IDC,21.7,Primary,ER-/HER2-,35,2,Died of Disease
+MB.4792,49.92,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,6,IDC,pre,10,r,5.04,IDC,40.63333333,Primary,ER-/HER2-,20,2,Died of Disease
+MB.4881,37.05,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,11,IDC,pre,10,l,4.07,IDC,274.2,Primary,ER-/HER2-,35,NA,Living
+MB.4888,63.95,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,8,IDC,post,4ER-,r,4.032,IDC,230.5,Primary,ER-/HER2-,16,1,Living
+MB.4911,43.51,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,4,IDC,pre,10,l,5.03,IDC,31.43333333,Primary,ER-/HER2-,15,2,Died of Disease
+MB.4938,33.92,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,2,NEUT,30,IDC,pre,10,l,4.05,IDC,70.6,Primary,ER-/HER2-,25,2,Died of Disease
+MB.4982,62.99,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,Her2,3,pos,-,-,-,3,GAIN,5,IDC,post,4ER+,r,6.034,IDC,19.16666667,Primary,ER-/HER2-,17,NA,Died of Disease
+MB.4993,33.55,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Her2,3,neg,-,-,-,3,NEUT,15,IDC,pre,4ER-,l,6.1,IDC,75.23333333,Primary,ER-/HER2-,50,2,Died of Disease
+MB.5008,65.76,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Her2,3,neg,-,-,-,3,NEUT,4,IDC,post,10,l,5.12,IDC,223.3,Primary,ER-/HER2-,60,3,Living
+MB.5041,45.4,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,claudin-low,3,pos,-,-,-,3,NEUT,2,IDC,pre,2,l,4.04,IDC,173.9333333,Primary,ER-/HER2-,20,1,Living
+MB.5058,61.04,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Normal,3,neg,-,-,-,3,NEUT,6,IDC,post,7,r,6.03,IDC,178.7333333,Primary,ER-/HER2-,15,2,Died of Disease
+MB.5076,28.05,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,0,IDC,pre,10,r,5.07,BRCA,26.86666667,Primary,ER-/HER2-,35,2,Died of Disease
+MB.5100,32.74,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,claudin-low,3,neg,-,-,-,3,NEUT,6,IDC,pre,10,l,6.04,IDC,19.9,Primary,ER-/HER2-,20,2,Died of Disease
+MB.5102,69.93,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,3,neg,-,-,-,3,NEUT,6,IDC,post,10,l,6.04,IDC,30.36666667,Primary,NA,20,2,Died of Disease
+MB.5115,40.57,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,3,IDC,pre,10,l,5.06,IDC,77.4,Primary,ER-/HER2-,30,2,Living
+MB.5135,38.59,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,7,IDC,pre,10,r,4.07,IDC,37.36666667,Primary,NA,35,2,Died of Disease
+MB.5137,36.04,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,GAIN,0,IDC,pre,10,r,5.05,BRCA,43.26666667,Primary,ER-/HER2-,25,2,Living
+MB.5145,61.55,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,Normal,3,pos,-,-,-,3,NEUT,2,IDC,post,9,r,4.05,IDC,159.2333333,Primary,ER-/HER2-,25,2,Died of Disease
+MB.5155,51.08,BREAST CONSERVING,Breast Cancer,Breast Invasive Lobular Carcinoma,moderate,YES,YES,YES,Normal,3,neg,-,-,-,NA,NEUT,7,ILC,post,4ER-,r,2.06,ILC,259.9333333,Primary,NA,30,2,Living
+MB.5213,74.98,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Her2,3,neg,-,-,-,3,GAIN,9,IDC,post,5,l,6.05,IDC,43.4,Primary,HER2+,25,3,Died of Disease
+MB.5223,42.05,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,3,neg,-,-,-,2,NEUT,2,IDC,pre,4ER-,r,4.044,IDC,144.6666667,Primary,ER-/HER2-,22,2,Died of Disease
+MB.5225,68.01,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Basal,3,neg,-,-,-,3,NEUT,10,IDC,post,10,l,4.06,IDC,43.26666667,Primary,ER-/HER2-,30,2,Died of Disease
+MB.5235,59.04,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,pos,-,-,-,2,NEUT,13,IDC,post,9,r,3.012,IDC,204.2,Primary,ER-/HER2-,6,1,Died of Disease
+MB.5236,63.02,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,3,neg,-,-,-,3,NEUT,5,IDC,post,10,r,5.13,IDC,166.6666667,Primary,ER-/HER2-,65,3,Living
+MB.5255,58.7,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,low,NO,YES,NO,claudin-low,3,neg,-,-,-,3,GAIN,0,IDC,post,4ER-,l,4.03,BRCA,53.56666667,Primary,ER-/HER2-,15,1,Living
+MB.5281,55.72,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,LumA,3,neg,-,-,-,3,NEUT,7,IDC,post,4ER-,l,4.03,IDC,79.3,Primary,ER+/HER2- Low Prolif,15,1,Living
+MB.5325,43.04,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,moderate,YES,YES,YES,claudin-low,3,neg,-,-,-,3,NEUT,0,IDC,pre,10,l,5.16,BRCA,204.2333333,Primary,ER-/HER2-,80,NA,Living
+MB.5346,52.09,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,9,IDC,post,10,l,5.16,IDC,194.3,Primary,NA,80,NA,Living
+MB.5387,45.33,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,0,IDC-MED,pre,10,r,5.026,BRCA,45.63333333,Primary,ER-/HER2-,13,2,Died of Disease
+MB.5390,37.27,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,3,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,6.026,IDC,30.93333333,Primary,ER-/HER2-,13,3,Died of Disease
+MB.5408,65.48,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,claudin-low,3,pos,-,-,-,2,GAIN,6,IDC,post,4ER+,r,3.032,IDC,101.4,Primary,ER-/HER2-,16,1,Living
+MB.5421,68,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,4,IDC,post,10,l,4.04,IDC,194.5666667,Primary,ER-/HER2-,20,1,Living
+MB.5440,49.05,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,YES,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,8,IDC-MED,pre,10,l,5.036,BRCA,196.6333333,Primary,ER-/HER2-,18,2,Living
+MB.5446,51.25,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,Her2,3,neg,-,-,-,3,NEUT,7,IDC,post,4ER-,l,5.05,IDC,162.8333333,Primary,ER-/HER2-,25,2,Died of Disease
+MB.5450,38.92,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,6,IDC,pre,10,r,4.024,IDC,190.2,Primary,ER-/HER2-,12,1,Living
+MB.5465,69.83,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,NO,YES,YES,Basal,3,neg,-,-,-,3,LOSS,7,IDC,post,10,r,4.05,IDC,18.8,Primary,ER-/HER2-,25,2,Died of Disease
+MB.5526,45.42,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,NO,YES,NO,Basal,3,neg,-,-,-,3,NEUT,10,IDC-MED,pre,10,r,4.04,BRCA,151.0666667,Primary,ER-/HER2-,20,1,Living
+MB.5529,40.21,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,5.07,IDC,14.8,Primary,ER-/HER2-,35,2,Died of Disease
+MB.5531,66.56,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,claudin-low,3,neg,-,-,-,2,NEUT,7,IDC,post,10,r,3.03,IDC,183.9666667,Primary,ER-/HER2-,15,1,Living
+MB.5547,43.08,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,5,IDC,pre,10,r,5.06,IDC,98.56666667,Primary,ER-/HER2-,30,2,Living
+MB.5551,67.24,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,Basal,3,neg,-,-,-,3,NEUT,8,IDC,post,10,r,4.054,IDC,182.2333333,Primary,ER-/HER2-,27,2,Living
+MB.5560,44.05,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,NO,Basal,3,neg,-,-,-,2,LOSS,2,IDC,pre,10,r,3.03,IDC,186.6,Primary,ER-/HER2-,15,1,Living
+MB.5566,38.44,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,3,neg,-,-,-,3,NEUT,3,IDC,pre,10,r,6.064,IDC,234.4,Primary,ER-/HER2-,32,NA,Living
+MB.5572,47.88,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,NA,NO,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,2,IDC-MED,pre,10,r,4.03,BRCA,178.6333333,Primary,ER-/HER2-,15,1,Living
+MB.5602,39.7,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,3,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,6.08,IDC,224.4333333,Primary,ER-/HER2-,40,NA,Living
+MB.5616,41.53,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,3,IDC,pre,10,l,6.04,IDC,180.6333333,Primary,ER-/HER2-,20,2,Living
+MB.5624,55.43,BREAST CONSERVING,Breast Cancer,Breast Invasive Lobular Carcinoma,high,YES,YES,YES,Basal,3,neg,-,-,-,3,NEUT,17,ILC,post,10,r,5.05,ILC,136,Primary,NA,25,NA,Living
+MB.5633,62.7,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,3,neg,-,-,-,3,NEUT,2,IDC,post,4ER-,l,6.06,IDC,35.03333333,Primary,ER-/HER2-,30,3,Died of Disease
+MB.5651,51.98,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,claudin-low,3,neg,-,-,-,3,NEUT,7,IDC,post,3,r,5.052,IDC,21,Primary,ER-/HER2-,26,2,Died of Disease
+MB.6055,33.08,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,5,neg,-,-,-,3,NEUT,12,IDC,pre,10,l,5.05,IDC,200.4333333,Primary,ER-/HER2-,25,NA,Living
+MB.6062,31.6,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,high,NO,YES,NO,claudin-low,5,neg,-,-,-,3,NEUT,7,IDC-MED,pre,10,l,4.044,BRCA,282.3666667,Primary,ER-/HER2-,22,NA,Living
+MB.6143,60.6,BREAST CONSERVING,Breast Cancer,Invasive Breast Carcinoma,moderate,NO,YES,NO,claudin-low,5,neg,-,-,-,3,NEUT,6,INVASIVE TUMOUR,post,9,r,4.092,BRCA,255.6,Primary,ER-/HER2-,46,2,Living
+MB.6223,58.83,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,5,neg,-,-,-,3,NEUT,5,IDC,post,10,l,5.04,IDC,221.9333333,Primary,ER-/HER2-,20,2,Living
+MB.6242,41.29,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,5,neg,-,-,-,3,NEUT,15,IDC,pre,10,l,6.11,IDC,165.4333333,Primary,ER-/HER2-,55,NA,Living
+MB.6248,51.22,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,5,neg,-,-,-,3,NEUT,8,IDC,post,10,l,5.11,IDC,182.8333333,Primary,ER-/HER2-,55,NA,Living
+MB.6251,48.59,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,5,neg,-,-,-,3,LOSS,6,IDC,pre,10,r,5.06,IDC,14.7,Primary,NA,30,2,Died of Disease
+MB.6272,36.93,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,claudin-low,5,neg,-,-,-,3,NEUT,6,IDC,pre,10,r,5,IDC,22.4,Primary,NA,NA,NA,Died of Disease
+MB.6280,53.68,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,5,neg,-,-,-,3,NEUT,6,IDC,post,10,l,5.088,IDC,27.86666667,Primary,NA,44,NA,Died of Disease
+MB.6305,52.85,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,5,neg,-,-,-,3,GAIN,9,IDC,post,10,l,5.06,IDC,89.53333333,Primary,ER-/HER2-,30,NA,Died of Disease
+MB.6336,63.22,MASTECTOMY,Breast Cancer,Invasive Breast Carcinoma,moderate,YES,YES,NO,Basal,5,neg,-,-,-,3,NEUT,2,INVASIVE TUMOUR,post,2,r,6.05,BRCA,17.2,Primary,ER-/HER2-,25,NA,Died of Disease
+MB.7007,54.44,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,GAIN,7,IDC,post,10,l,5.034,IDC,58.6,Primary,ER-/HER2-,17,NA,Living
+MB.7009,68.28,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,3,IDC,post,10,r,5.054,IDC,54.76666667,Primary,ER-/HER2-,27,NA,Died of Disease
+MB.7012,60.96,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,5,IDC,post,10,l,4.04,IDC,19.83333333,Primary,ER-/HER2-,20,NA,Died of Disease
+MB.7017,36.63,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,4,neg,-,-,-,3,NEUT,5,IDC,pre,10,r,5.054,IDC,135.3333333,Primary,ER-/HER2-,27,NA,Living
+MB.7023,66.66,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,claudin-low,4,neg,-,-,-,3,NEUT,6,IDC,post,10,r,5.08,IDC,27.96666667,Primary,ER-/HER2-,40,NA,Died of Disease
+MB.7025,65.22,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,claudin-low,4,neg,-,-,-,3,NEUT,2,IDC,post,4ER-,NA,4.026,IDC,80.23333333,Primary,ER-/HER2-,13,NA,Living
+MB.7031,60.58,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,5,IDC,post,10,r,5.08,IDC,85.36666667,Primary,NA,40,NA,Living
+MB.7036,54.48,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,4,IDC,post,10,NA,5.036,IDC,120.4333333,Primary,ER-/HER2-,18,NA,Living
+MB.7038,57.62,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,16,IDC,post,10,r,5.044,IDC,81.03333333,Primary,ER-/HER2-,22,NA,Living
+MB.7045,61.39,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Her2,4,neg,-,-,-,2,NEUT,3,IDC,post,4ER-,r,3.04,IDC,94.93333333,Primary,ER-/HER2-,20,NA,Died of Disease
+MB.7049,48.75,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,Basal,4,neg,-,-,-,3,NEUT,7,IDC,pre,4ER-,r,4.036,IDC,102.0333333,Primary,ER-/HER2-,18,NA,Living
+MB.7052,45.45,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,NO,claudin-low,4,neg,-,-,-,3,NEUT,3,IDC,pre,9,r,4.0358,IDC,106.1333333,Primary,ER-/HER2-,17.9,NA,Living
+MB.7066,64.24,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,low,YES,YES,NO,Her2,4,neg,-,-,-,3,GAIN,7,IDC,post,3,r,5.037,IDC,89.76666667,Primary,ER+/HER2- Low Prolif,18.5,NA,Living
+MB.7078,74.8,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,claudin-low,4,neg,-,-,-,3,NEUT,6,IDC,post,10,NA,4.1,IDC,4.166666667,Primary,ER-/HER2-,50,NA,Died of Disease
+MB.7081,69.12,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,NO,YES,YES,claudin-low,4,neg,-,-,-,3,NEUT,6,IDC,post,10,r,4.056,IDC,140.2333333,Primary,ER-/HER2-,28,NA,Living
+MB.7089,47.7,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,NO,claudin-low,4,neg,-,-,-,3,GAIN,10,IDC,pre,10,r,5.036,IDC,118.9,Primary,ER-/HER2-,18,NA,Living
+MB.7090,48.52,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,4,IDC,pre,10,l,5.034,IDC,109.7666667,Primary,ER-/HER2-,17,NA,Living
+MB.7114,55.57,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,NO,YES,YES,Basal,4,neg,-,-,-,3,NEUT,8,IDC,post,10,l,4.032,IDC,123.2666667,Primary,ER-/HER2-,16,NA,Living
+MB.7119,54.53,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,4,neg,-,-,-,3,NEUT,8,IDC,post,10,l,5.046,IDC,128.3666667,Primary,ER-/HER2-,23,NA,Living
+MB.7145,44.42,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,9,IDC,pre,10,r,5.05,IDC,138.3333333,Primary,ER-/HER2-,25,NA,Living
+MB.7155,41.14,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,5,IDC,pre,10,l,5.0344,IDC,149.7666667,Primary,ER-/HER2-,17.2,NA,Living
+MB.7159,60.45,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,4,neg,-,-,-,3,NEUT,3,IDC,post,10,NA,4.068,IDC,21.93333333,Primary,NA,34,NA,Died of Disease
+MB.7165,28.78,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,NO,Basal,4,neg,-,-,-,3,NEUT,7,IDC,pre,10,l,5.364,IDC,147.1666667,Primary,ER-/HER2-,182,NA,Living
+MB.7205,38.17,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,Basal,4,neg,-,-,-,3,NEUT,15,IDC,pre,10,NA,5.05,IDC,166.0333333,Primary,ER-/HER2-,25,NA,Living
+MB.7208,48.83,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,4,neg,-,-,-,3,NEUT,4,IDC,pre,10,NA,6.0622,IDC,45.93333333,Primary,ER-/HER2-,31.1,NA,Died of Disease
+MB.7225,49.61,MASTECTOMY,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,4,neg,-,-,-,3,GAIN,5,IDC,pre,10,NA,5.076,IDC,55,Primary,NA,38,NA,Died of Disease
+MB.7258,45.11,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,high,YES,YES,YES,Basal,4,neg,-,-,-,3,NEUT,12,IDC,pre,10,NA,6.06,IDC,15.06666667,Primary,NA,30,NA,Died of Disease
+MB.7269,36.6,BREAST CONSERVING,Breast Cancer,Breast Invasive Ductal Carcinoma,moderate,YES,YES,YES,Basal,4,neg,-,-,-,3,GAIN,4,IDC,pre,10,NA,5.05,IDC,21.16666667,Primary,ER-/HER2-,25,NA,Died of Disease

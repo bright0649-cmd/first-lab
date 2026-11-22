@@ -1,0 +1,931 @@
+---
+title: "Lab 4: A Clinical Prediction Pipeline on METABRIC TNBC"
+author: "Bright Joses"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+> **AI use statement.** This submission was produced with substantial help from
+> Claude, an AI assistant made by Anthropic. Claude wrote the R code, ran the
+> analyses and drafted the written answers and tables in this file. It was not
+> used only to explain a concept or an error message. All results come from
+> running the code in this file on the supplied TNBC data.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+suppressPackageStartupMessages({
+  library(mice); library(caret); library(randomForest)
+  library(caTools); library(ggplot2); library(missForest)
+})
+options(width = 110)
+```
+
+# Scope and prediction task
+
+The file used is the METABRIC triple-negative (TNBC) subset: `tnbc_clinical.csv`
+(30 clinical columns) joined to `tnbc_mutation.csv` (18 gene mutation flags) by
+patient ID. Only this subset was available to me, so every step below
+(classification, missingness, imputation, leakage audit, pipeline) is run on it.
+
+**Prediction task.** Predict whether a patient *died of disease*
+(`VITAL_STATUS = "Died of Disease"`) from information available at one
+moment: **the tumour-board meeting after surgery and tumour profiling, before
+adjuvant chemotherapy, radiotherapy or hormone therapy is decided.** Everything
+in the leakage audit is judged against that moment.
+
+```{r load}
+cl <- read.csv("tnbc_clinical.csv", na.strings = c("NA", ""), check.names = FALSE,
+               stringsAsFactors = FALSE)
+mu <- read.csv("tnbc_mutation.csv", check.names = FALSE)
+names(cl)[1] <- "PATIENT_ID"; names(mu)[1] <- "PATIENT_ID"
+stopifnot(all(cl$PATIENT_ID == mu$PATIENT_ID))
+genes <- setdiff(names(mu), "PATIENT_ID")
+dat <- merge(cl, mu, by = "PATIENT_ID", sort = FALSE)
+dat$y <- factor(ifelse(dat$VITAL_STATUS == "Died of Disease", "Died", "Living"),
+                levels = c("Living", "Died"))
+c(patients = nrow(dat), clinical_cols = ncol(cl), gene_cols = length(genes))
+table(dat$y)
+```
+
+# 1. Classify every variable
+
+```{r classify}
+vc <- function(v, role, type, note = "") data.frame(variable = v, role = role, type = type, note = note)
+classification <- rbind(
+  vc("PATIENT_ID", "identifier", "nominal", "Row key, not a variable"),
+  vc("AGE_AT_DIAGNOSIS", "clinical", "numeric", "Years"),
+  vc("BREAST_SURGERY", "treatment", "binary", "Conserving vs mastectomy; done before the prediction moment"),
+  vc("CANCER_TYPE", "clinical", "constant", "'Breast Cancer' for every patient"),
+  vc("CANCER_TYPE_DETAILED", "clinical", "nominal", "Histology label, vocabulary 1"),
+  vc("CELLULARITY", "clinical", "ordinal", "low < moderate < high"),
+  vc("CHEMOTHERAPY", "treatment", "binary", "Adjuvant, decided after the prediction moment"),
+  vc("RADIO_THERAPY", "treatment", "binary", "Adjuvant; 'YES' for every patient"),
+  vc("HORMONE_THERAPY", "treatment", "binary", "Adjuvant, decided after the prediction moment"),
+  vc("CLAUDIN_SUBTYPE", "genomic", "nominal", "Expression-based subtype"),
+  vc("COHORT", "clinical", "nominal", "Study cohort (1-5): administrative"),
+  vc("ER_IHC", "clinical", "binary", "Immunohistochemistry ER result"),
+  vc("ER_STATUS", "clinical", "constant", "'-' for every patient (TNBC definition)"),
+  vc("PR_STATUS", "clinical", "constant", "'-' for every patient (TNBC definition)"),
+  vc("HER2_STATUS", "clinical", "constant", "'-' for every patient (TNBC definition)"),
+  vc("GRADE", "clinical", "ordinal", "Tumour grade 1 < 2 < 3"),
+  vc("HER2_SNP6", "genomic", "nominal", "HER2 copy-number call (GAIN/LOSS/NEUT)"),
+  vc("MUTATION_COUNT", "genomic", "numeric (count)", "Number of mutations"),
+  vc("HISTOLOGICAL_SUBTYPE", "clinical", "nominal", "Histology label, vocabulary 2"),
+  vc("INFERRED_MENOPAUSAL_STATE", "clinical", "binary", "pre / post"),
+  vc("INTCLUST", "genomic", "nominal", "Integrative cluster (copy number + expression)"),
+  vc("LATERALITY", "clinical", "binary", "Left / right"),
+  vc("NPI", "clinical", "numeric", "Nottingham Prognostic Index"),
+  vc("ONCOTREE_CODE", "clinical", "nominal", "Histology label, vocabulary 3"),
+  vc("OS_MONTHS", "outcome", "numeric", "Overall survival time"),
+  vc("SAMPLE_TYPE", "clinical", "constant", "'Primary' for every patient"),
+  vc("THREEGENE", "genomic", "nominal", "Three-gene classifier from expression"),
+  vc("TUMOR_SIZE", "clinical", "numeric", "mm"),
+  vc("TUMOR_STAGE", "clinical", "ordinal", "0 < 1 < 2 < 3"),
+  vc("VITAL_STATUS", "outcome", "binary", "The label: Died of Disease / Living"),
+  do.call(rbind, lapply(genes, function(g) vc(g, "genomic", "binary", "Gene mutated (1) or not (0)")))
+)
+rownames(classification) <- NULL
+stopifnot(setequal(classification$variable, c(names(cl), genes)))
+table(classification$role)
+knitr::kable(classification[classification$role != "genomic" | !classification$variable %in% genes, ])
+```
+
+The 18 mutation columns (`r paste(genes, collapse = ", ")`) are all **genomic**,
+binary variables.
+
+# 2. Missingness: by variable, and its pattern
+
+## By variable
+
+```{r miss-var}
+miss_tab <- data.frame(variable = names(cl),
+                       n_missing = sapply(cl, function(x) sum(is.na(x))))
+miss_tab$pct_missing <- round(100 * miss_tab$n_missing / nrow(cl), 1)
+miss_tab <- miss_tab[miss_tab$n_missing > 0, ]
+miss_tab[order(-miss_tab$n_missing), ]
+```
+
+Seven variables have gaps and the remaining `r ncol(cl) - 1 - nrow(miss_tab)`
+(apart from the ID) are complete. The gene mutation file has no missing values.
+
+## Pattern
+
+```{r miss-pattern, fig.height=5}
+na_vars <- miss_tab$variable
+md.pattern(cl[, na_vars], rotate.names = TRUE)
+```
+
+```{r miss-cohort}
+cohort_miss <- do.call(rbind, lapply(na_vars, function(v)
+  data.frame(variable = v, COHORT = sort(unique(cl$COHORT)),
+             pct_missing = sapply(sort(unique(cl$COHORT)), function(k)
+               100 * mean(is.na(cl[[v]][cl$COHORT == k]))))))
+ggplot(cohort_miss, aes(factor(COHORT), variable, fill = pct_missing)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(pct_missing)), size = 3) +
+  scale_fill_gradient(low = "white", high = "firebrick") +
+  labs(title = "Percent missing, by study cohort", x = "Cohort", fill = "% missing") +
+  theme_minimal()
+```
+
+```{r miss-tests}
+p_cohort <- sapply(na_vars, function(v)
+  fisher.test(table(is.na(cl[[v]]), cl$COHORT), simulate.p.value = TRUE, B = 5000)$p.value)
+p_outcome <- sapply(na_vars, function(v)
+  fisher.test(table(is.na(cl[[v]]), dat$y))$p.value)
+round(data.frame(p_missing_vs_cohort = p_cohort, p_missing_vs_outcome = p_outcome), 4)
+table(THREEGENE_missing = is.na(dat$THREEGENE), dat$y)
+prop.table(table(THREEGENE_missing = is.na(dat$THREEGENE), dat$y), margin = 2)
+sum(is.na(cl$TUMOR_STAGE[cl$COHORT == 4])); sum(cl$COHORT == 4)
+```
+
+**Reading the pattern.**
+
+* `TUMOR_STAGE` and `LATERALITY` are missing for essentially whole blocks of one
+  cohort: all `r sum(cl$COHORT == 4)` cohort-4 patients have no stage
+  (`r sum(is.na(cl$TUMOR_STAGE[cl$COHORT == 4]))` of
+  `r sum(cl$COHORT == 4)`), and every missing laterality value is also in
+  cohort 4. This is **structural missingness**: that cohort never recorded
+  these fields. It is not random across patients, but it depends on a variable I
+  can see (the cohort), so it is *missing at random given the cohort*. It is
+  ignorable for imputation only if the stage-versus-other-variables
+  relationship is similar in cohort 4, which I cannot check because nobody in
+  that cohort has a stage.
+* `THREEGENE` is missing for `r sum(is.na(dat$THREEGENE))` patients, spread over
+  all cohorts. It is missing for
+  `r round(100 * mean(is.na(dat$THREEGENE[dat$y == "Died"])), 1)`% of the patients who died against
+  `r round(100 * mean(is.na(dat$THREEGENE[dat$y == "Living"])), 1)`% of those who lived
+  (Fisher p = `r round(p_outcome["THREEGENE"], 3)`).
+  `r if (p_outcome["THREEGENE"] < 0.05) "This is a statistically notable link with the outcome, so the gaps are plausibly **not** missing at random: a tumour the classifier could not call may itself be a sign of a different disease." else "The link with the outcome is not statistically significant, though the gap in rates is large enough that I treat the missingness as possibly informative."`
+* `CELLULARITY`, `ER_IHC`, `GRADE` and `TUMOR_SIZE` have only a handful of
+  missing values each (at most `r max(miss_tab$n_missing[miss_tab$variable %in% c("CELLULARITY", "ER_IHC", "GRADE", "TUMOR_SIZE")])`) and look like ordinary scattered gaps.
+
+# 3. Split first, then typed imputation
+
+## Typing every variable correctly
+
+```{r typing}
+# level labels become column names later, so make them unique, plain ASCII names
+# ("4ER-" and "4ER+" would otherwise both turn into "4ER.")
+clean_lv <- function(f, signs = FALSE) {
+  lv <- levels(f)
+  if (signs) lv <- gsub("-", "neg", gsub("\\+", "pos", lv))
+  levels(f) <- gsub("[^A-Za-z0-9]+", "_", lv)
+  f
+}
+typed <- function(d) {
+  out <- data.frame(
+    AGE_AT_DIAGNOSIS = as.numeric(d$AGE_AT_DIAGNOSIS),
+    NPI = as.numeric(d$NPI),
+    TUMOR_SIZE = as.numeric(d$TUMOR_SIZE),
+    MUTATION_COUNT = as.numeric(d$MUTATION_COUNT),
+    GRADE = factor(ifelse(is.na(d$GRADE), NA, ifelse(d$GRADE == 3, "3", "1-2")),
+                   levels = c("1-2", "3"), ordered = TRUE),
+    TUMOR_STAGE = factor(ifelse(is.na(d$TUMOR_STAGE), NA,
+                                ifelse(d$TUMOR_STAGE <= 1, "0-1", as.character(d$TUMOR_STAGE))),
+                         levels = c("0-1", "2", "3"), ordered = TRUE),
+    CELLULARITY = factor(d$CELLULARITY, levels = c("low", "moderate", "high"), ordered = TRUE),
+    ER_IHC = factor(d$ER_IHC), LATERALITY = factor(d$LATERALITY),
+    BREAST_SURGERY = factor(d$BREAST_SURGERY),
+    INFERRED_MENOPAUSAL_STATE = factor(d$INFERRED_MENOPAUSAL_STATE),
+    CLAUDIN_SUBTYPE = factor(d$CLAUDIN_SUBTYPE), HER2_SNP6 = factor(d$HER2_SNP6),
+    INTCLUST = factor(d$INTCLUST), THREEGENE = factor(d$THREEGENE),
+    COHORT = factor(d$COHORT))
+  out$INTCLUST  <- clean_lv(out$INTCLUST, signs = TRUE)
+  out$THREEGENE <- clean_lv(out$THREEGENE, signs = TRUE)
+  out$CLAUDIN_SUBTYPE <- clean_lv(out$CLAUDIN_SUBTYPE)
+  out$BREAST_SURGERY  <- clean_lv(out$BREAST_SURGERY)
+  out
+}
+numeric_v <- c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT")
+ordinal_v <- c("GRADE", "TUMOR_STAGE", "CELLULARITY")
+nominal_v <- c("BREAST_SURGERY", "INFERRED_MENOPAUSAL_STATE", "LATERALITY", "ER_IHC",
+               "CLAUDIN_SUBTYPE", "HER2_SNP6", "INTCLUST", "THREEGENE")
+X <- typed(dat)
+sapply(X, function(x) class(x)[1])
+table(dat$GRADE, useNA = "ifany"); table(dat$TUMOR_STAGE, useNA = "ifany")
+```
+
+Grade 1 has 2 patients and stage 0 has 1 patient, too few for any model to
+learn, so I merged them into the next level (grade `1-2`, stage `0-1`). The
+ordering is kept, so both stay *ordered* factors, not numbers.
+
+## Split first
+
+```{r split}
+set.seed(2026)
+s  <- sample.split(dat$y, SplitRatio = 0.7)      # stratified on the outcome
+tr <- which(s); te <- which(!s)
+rbind(train = table(dat$y[tr]), test = table(dat$y[te]))
+```
+
+From here on, **nothing is learned from the test rows**: not an imputation
+model, not a mean, not a selected feature.
+
+## Which imputer is better? A masking experiment on the training rows
+
+To compare methods I hide 25% of the *known* stages in the training rows,
+impute them, and score the guesses against the truth.
+
+```{r mask-exp, cache=TRUE}
+set.seed(7)
+known <- which(!is.na(X$TUMOR_STAGE[tr]) & X$COHORT[tr] != "4")
+base  <- X[tr, ]
+lv    <- levels(base$TUMOR_STAGE)
+score <- function(truth, guess_num) {
+  g <- pmin(pmax(round(guess_num), 1), 3)
+  c(acc = mean(g == as.integer(truth)), mae = mean(abs(guess_num - as.integer(truth))),
+    nonint = mean(abs(guess_num - round(guess_num)) > 1e-9))
+}
+res <- do.call(rbind, lapply(1:10, function(i) {
+  hide <- sample(known, round(0.25 * length(known)))
+  d <- base; truth <- d$TUMOR_STAGE[hide]; d$TUMOR_STAGE[hide] <- NA
+  mk <- function(method, dd) {
+    mt <- make.method(dd); mt[] <- ""
+    mt[colSums(is.na(dd)) > 0] <- "pmm"; mt["TUMOR_STAGE"] <- method
+    for (v in c("GRADE", "CELLULARITY")) if (any(is.na(dd[[v]]))) mt[v] <- "polr"
+    for (v in c("ER_IHC", "LATERALITY")) if (any(is.na(dd[[v]]))) mt[v] <- "logreg"
+    if (any(is.na(dd$THREEGENE))) mt["THREEGENE"] <- "cart"
+    # mice's polr/logreg fail when a variable has exactly one gap: use a tree there
+    one <- names(mt)[colSums(is.na(dd)) == 1 & !names(mt) %in% c("TUMOR_STAGE", numeric_v)]
+    mt[one] <- "cart"
+    mt[colSums(is.na(dd)) == 0] <- ""
+    mt
+  }
+  # (a) treated as continuous
+  dn <- d; dn$TUMOR_STAGE <- as.numeric(dn$TUMOR_STAGE)
+  gn <- suppressWarnings(mice::complete(mice(dn, m = 1, maxit = 5, method = mk("norm", dn),
+                                       printFlag = FALSE, seed = i), 1))$TUMOR_STAGE[hide]
+  # (b) ordered factor with proportional odds
+  go <- suppressWarnings(mice::complete(mice(d, m = 1, maxit = 5, method = mk("polr", d),
+                                       printFlag = FALSE, seed = i), 1))$TUMOR_STAGE[hide]
+  # (b2) random-forest imputation inside mice (still typed: it sees an ordered factor)
+  gr <- suppressWarnings(mice::complete(mice(d, m = 1, maxit = 5, method = mk("rf", d), ntrees = 100,
+                                       printFlag = FALSE, seed = i), 1))$TUMOR_STAGE[hide]
+  # (c) missForest
+  gf <- suppressWarnings(missForest(d, ntree = 100, verbose = FALSE)$ximp)$TUMOR_STAGE[hide]
+  # (d) mode
+  md <- names(which.max(table(d$TUMOR_STAGE)))
+  rbind(data.frame(method = "treated as continuous (norm)", t(score(truth, gn))),
+        data.frame(method = "mice polr (ordered factor)", t(score(truth, as.integer(go)))),
+        data.frame(method = "mice rf (random forest)", t(score(truth, as.integer(gr)))),
+        data.frame(method = "missForest", t(score(truth, as.integer(gf)))),
+        data.frame(method = "most common level", t(score(truth, rep(match(md, lv), length(hide))))))
+}))
+mask_summary <- aggregate(cbind(acc, mae, nonint) ~ method, data = res, FUN = mean)
+mask_summary[, -1] <- round(mask_summary[, -1], 3)
+names(mask_summary) <- c("method", "exact_match", "mean_abs_error_in_stages", "share_non_integer")
+mask_summary[order(-mask_summary$exact_match), ]
+
+# pick the best method that can be fitted on training rows only and applied to new rows
+em <- setNames(mask_summary$exact_match, mask_summary$method)
+stage_method <- if (em["mice rf (random forest)"] > em["mice polr (ordered factor)"]) "rf" else "polr"
+stage_method
+```
+
+`missForest` scored highest, but it has no way to fill new rows from a model it
+learned (the test rows would have to take part in fitting it), so it cannot be
+used in a split-first pipeline. Among methods that **can** be fitted on the
+training rows and applied to the test rows (`mice` with the `ignore` argument),
+the best for `TUMOR_STAGE` is **`mice` with `r stage_method`**
+(`r round(100 * em[ifelse(stage_method == "rf", "mice rf (random forest)", "mice polr (ordered factor)")])`% exact match, against
+`r round(100 * em["most common level"])`% for always guessing the most common stage).
+I use that for `TUMOR_STAGE`, and keep `polr` for the other ordered variables,
+which have only a handful of gaps and are too few to test the same way.
+
+## Typed imputation with mice, learned on the training rows only
+
+Each variable with gaps gets the method that matches its type. `mice`'s
+`ignore` argument keeps the test rows out of every model fit while still
+filling their gaps from models trained on the training rows.
+
+```{r mice-run}
+st   <- rbind(X[tr, ], X[te, ])
+ign  <- c(rep(FALSE, length(tr)), rep(TRUE, length(te)))
+meth <- make.method(st); meth[] <- ""
+meth[numeric_v]                     <- "pmm"      # numeric: predictive mean matching
+meth[c("GRADE", "CELLULARITY")]     <- "polr"    # ordered factor: proportional odds
+meth["TUMOR_STAGE"]                 <- stage_method  # chosen by the masking experiment above
+meth[c("ER_IHC", "LATERALITY")]     <- "logreg"   # two-level factor: logistic regression
+meth["THREEGENE"]                   <- "cart"     # sparse 4-level factor: classification tree
+meth[colSums(is.na(st)) == 0]       <- ""         # nothing to impute
+meth[meth != ""]
+
+imp <- suppressWarnings(mice(st, m = 5, maxit = 10, method = meth, ntrees = 100,
+                             predictorMatrix = make.predictorMatrix(st),
+                             ignore = ign, seed = 1, printFlag = FALSE))
+Xc <- mice::complete(imp, 1)
+c(remaining_NA = sum(is.na(Xc)))
+Xc_tr <- Xc[seq_along(tr), ]; Xc_te <- Xc[-seq_along(tr), ]
+```
+
+**How stable are the imputed values?** With five imputations, this is the share
+of missing cells where all five draws agree.
+
+```{r stability-imp}
+agree <- sapply(names(meth[meth != ""]), function(v) {
+  m <- imp$imp[[v]]
+  if (is.null(m) || nrow(m) == 0) return(NA)
+  mean(apply(m, 1, function(r) length(unique(r)) == 1))
+})
+data.frame(variable = names(agree), method = meth[names(agree)],
+           n_imputed = sapply(names(agree), function(v) nrow(imp$imp[[v]])),
+           pct_all_five_agree = round(100 * agree))
+```
+
+One warning about `TUMOR_STAGE`: because every cohort-4 patient is missing
+stage, the observed stages carry no information about how cohort 4 differs
+(the cohort is not a usable predictor for it). Those patients' stage is
+predicted from their other variables only, and my masking experiment (which hid
+stages only in the other cohorts) cannot show how well that works for cohort 4.
+
+# 4. Leakage audit
+
+The question for each candidate: **would this value be known, and would it be
+unaffected by the outcome, at the tumour-board moment defined above?**
+
+```{r leakage-table}
+audit <- data.frame(
+  variable = c("AGE_AT_DIAGNOSIS", "BREAST_SURGERY", "CELLULARITY", "GRADE",
+               "INFERRED_MENOPAUSAL_STATE", "LATERALITY", "NPI", "TUMOR_SIZE", "TUMOR_STAGE",
+               "ER_IHC", "CLAUDIN_SUBTYPE", "HER2_SNP6", "MUTATION_COUNT", "INTCLUST",
+               "THREEGENE", "18 gene mutation flags", "COHORT",
+               "OS_MONTHS", "VITAL_STATUS", "CHEMOTHERAPY", "HORMONE_THERAPY", "RADIO_THERAPY"),
+  known_when = c("At diagnosis", "At surgery", "Pathology after surgery", "Pathology after surgery",
+                 "At diagnosis", "At diagnosis", "Pathology (size, grade, nodes)",
+                 "Pathology after surgery", "Pathology after surgery", "Pathology after surgery",
+                 "Tumour expression profiling", "Tumour copy-number profiling",
+                 "Tumour sequencing", "Tumour copy-number and expression profiling",
+                 "Tumour expression profiling", "Tumour sequencing",
+                 "Which study the patient joined",
+                 "Years of follow-up after the decision", "End of follow-up",
+                 "After the board decides", "After the board decides", "After the board decides"),
+  known_at_moment = c(rep("yes", 17), "no", "no (it is the label)", "no", "no", "no"),
+  verdict = c(rep("keep", 16), "keep as imputation helper only, not a predictor",
+              "remove: leakage", "label", "remove: leakage", "remove: leakage", "remove: leakage"),
+  stringsAsFactors = FALSE)
+knitr::kable(audit)
+```
+
+Notes on the judgement calls:
+
+* **Genomic variables** are legitimate only if tumour profiling has been done
+  before the decision. I assume it has (it is also what next week's TNBC model
+  needs), but it would not be true for a clinic without sequencing.
+* **`NPI`** is derived from size, grade and nodal status, so it is known after
+  pathology, but it largely repeats `TUMOR_SIZE` and `GRADE`; the correlation
+  step below deals with that, not leakage.
+* **`COHORT`** is known at the time but is a study artefact (site and period),
+  not biology; I use it only to help imputation, never as a predictor.
+* **Treatment** variables record decisions made *after* the moment: a model
+  using them would be reading the board's own view of the prognosis.
+
+## A statistical filter would pick the leaky variables
+
+This is the check that shows why leakage is a separate problem from statistical
+selection. Information gain (in bits) on the training rows, for the leaky
+variables and for the best legitimate ones:
+
+```{r leak-ig}
+H <- function(p) { p <- p[p > 0]; -sum(p * log2(p)) }
+ig1 <- function(x, y) {
+  if (is.numeric(x) && length(unique(x)) > 2) {
+    br <- unique(quantile(x, 0:4 / 4, na.rm = TRUE))
+    x <- cut(x, br, include.lowest = TRUE)
+  }
+  tab <- table(x, y); px <- rowSums(tab) / sum(tab)
+  H(prop.table(table(y))) - sum(px * apply(tab, 1, function(r) H(r / sum(r))))
+}
+ytr <- dat$y[tr]
+leaky <- data.frame(OS_MONTHS = dat$OS_MONTHS, CHEMOTHERAPY = dat$CHEMOTHERAPY,
+                    HORMONE_THERAPY = dat$HORMONE_THERAPY)[tr, ]
+legit <- cbind(Xc_tr[, c("NPI", "TUMOR_SIZE", "GRADE", "TUMOR_STAGE", "AGE_AT_DIAGNOSIS")],
+               dat[tr, c("TP53", "PIK3CA")])
+ig_compare <- c(sapply(leaky, ig1, y = ytr), sapply(as.data.frame(lapply(legit, function(z) if (is.ordered(z)) as.integer(z) else z)), ig1, y = ytr))
+data.frame(variable = names(ig_compare), info_gain_bits = round(ig_compare, 3),
+           type = c(rep("leaky", ncol(leaky)), rep("legitimate", ncol(legit))))[order(-ig_compare), ]
+```
+
+`OS_MONTHS` carries far more information about the outcome than any legitimate
+predictor, because survival time and vital status are two sides of the same
+event. It would be selected first by any data-driven filter, which is why it has
+to be removed by *reasoning*, before the statistics.
+
+# 5. TNBC feature pipeline (learned on the training rows only)
+
+Candidate predictors after the domain and leakage decisions: 10 clinical, 5
+genomic summary variables and 18 gene flags. The test rows get the *same*
+transformations, never refitted.
+
+## Encoding
+
+* Numeric variables stay numeric.
+* Ordered factors become integer codes that respect the order.
+* Nominal factors become one-hot columns (`fullRank`, so one level is the baseline).
+* Gene flags are already 0/1.
+
+```{r encode}
+make_feat <- function(Xcomp, rows) {
+  f <- Xcomp[, c(numeric_v, ordinal_v, nominal_v)]
+  for (o in ordinal_v) f[[o]] <- as.integer(f[[o]])
+  cbind(f, dat[rows, genes])
+}
+feat_tr <- make_feat(Xc_tr, tr); feat_te <- make_feat(Xc_te, te)
+dv  <- dummyVars(~ ., data = feat_tr, fullRank = TRUE)
+Etr <- predict(dv, feat_tr); Ete <- predict(dv, feat_te)
+colnames(Etr) <- colnames(Ete) <- make.names(colnames(Etr), unique = TRUE)
+stopifnot(!anyDuplicated(colnames(Etr)))
+c(encoded_columns = ncol(Etr), train_rows = nrow(Etr), test_rows = nrow(Ete))
+all_vars <- c(numeric_v, ordinal_v, nominal_v, genes)
+map_var <- function(cols) sapply(cols, function(cn) {
+  hit <- all_vars[startsWith(cn, all_vars)]
+  hit[which.max(nchar(hit))]
+})
+col_var <- map_var(colnames(Etr))
+```
+
+## Step 1: near-zero variance, then scaling
+
+```{r nzv}
+nz <- nearZeroVar(Etr, saveMetrics = TRUE)
+keep_nzv <- rownames(nz)[!nz$nzv]
+Etr1 <- Etr[, keep_nzv]; Ete1 <- Ete[, keep_nzv]
+c(before = ncol(Etr), after_nzv = ncol(Etr1))
+# scaling parameters come from the TRAINING rows only
+pp  <- preProcess(Etr1, method = c("center", "scale"))
+Str <- predict(pp, Etr1); Ste <- predict(pp, Ete1)
+round(c(train_mean_NPI = mean(Str[, "NPI"]), test_mean_NPI = mean(Ste[, "NPI"]),
+        train_sd_NPI = sd(Str[, "NPI"]), test_sd_NPI = sd(Ste[, "NPI"])), 3)
+```
+
+Columns with near-zero variance (here, mostly rare mutations) are dropped. The
+test set is *not* exactly mean 0, SD 1: that is correct, it was scaled with the
+training numbers.
+
+## Step 2: correlation
+
+```{r corr}
+cm <- cor(Str)
+pairs <- which(upper.tri(cm), arr.ind = TRUE)
+top <- data.frame(a = colnames(cm)[pairs[, 1]], b = colnames(cm)[pairs[, 2]], r = cm[pairs])
+top <- top[order(-abs(top$r)), ]
+head(top, 8)
+# Tie-break by domain knowledge: menopausal state is *inferred from age*, so when the
+# two are highly correlated I drop the derived variable and keep age (the richer one).
+drop_derived <- if (abs(cm["AGE_AT_DIAGNOSIS", "INFERRED_MENOPAUSAL_STATE.pre"]) > 0.8)
+  "INFERRED_MENOPAUSAL_STATE.pre" else character(0)
+rest <- setdiff(colnames(cm), drop_derived)
+corr_drop <- c(drop_derived, findCorrelation(cm[rest, rest], cutoff = 0.8, names = TRUE))
+corr_drop
+keep_corr <- setdiff(colnames(Str), corr_drop)
+```
+
+```{r corr-plot, fig.height=6}
+cm_long <- as.data.frame(as.table(cm)); names(cm_long) <- c("a", "b", "r")
+top_cols <- unique(c(head(top$a, 6), head(top$b, 6), "NPI", "TUMOR_STAGE", "GRADE", "TUMOR_SIZE"))
+top_cols <- intersect(top_cols, colnames(cm))
+ggplot(subset(cm_long, a %in% top_cols & b %in% top_cols), aes(a, b, fill = r)) +
+  geom_tile() + geom_text(aes(label = round(r, 2)), size = 2.5) +
+  scale_fill_gradient2(low = "steelblue", mid = "white", high = "firebrick", limits = c(-1, 1)) +
+  labs(title = "Correlation among the most related features (training rows)", x = NULL, y = NULL) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Step 3: information gain (with a permutation null)
+
+For each remaining column I compute the information gain about the outcome (in
+bits, numeric columns cut into quartiles) and compare it with the gain I would
+get from the same column if the outcome labels were shuffled. A column is kept
+only if its real gain exceeds the 95th percentile of its own shuffled gains.
+
+```{r ig, cache=TRUE}
+ig_vec <- function(M, y) sapply(seq_len(ncol(M)), function(j) ig1(M[, j], y))
+set.seed(11)
+M <- Etr1[, keep_corr, drop = FALSE]
+ig_real <- ig_vec(M, ytr)
+null <- replicate(300, ig_vec(M, sample(ytr)))
+ig_thr <- apply(null, 1, quantile, probs = 0.95)
+ig_tab <- data.frame(column = colnames(M), variable = col_var[colnames(M)],
+                     info_gain = ig_real, null_95 = ig_thr, keep = ig_real > ig_thr)
+ig_tab <- ig_tab[order(-ig_tab$info_gain), ]
+rownames(ig_tab) <- NULL
+ig_keep <- ig_tab$column[ig_tab$keep]
+head(ig_tab, 12)
+c(tested = nrow(ig_tab), kept = length(ig_keep))
+```
+
+## Step 4: recursive feature elimination (RFE)
+
+```{r rfe, cache=TRUE}
+set.seed(13)
+xr <- as.data.frame(Str[, ig_keep, drop = FALSE])
+sizes <- sort(unique(pmin(c(2, 3, 4, 5, 6, 8, 10, 12, 15, 20), ncol(xr))))
+ctrl <- rfeControl(functions = rfFuncs, method = "repeatedcv", number = 5, repeats = 3)
+rfe_fit <- rfe(x = xr, y = ytr, sizes = sizes, rfeControl = ctrl, ntree = 300)
+rfe_sel <- predictors(rfe_fit)
+rfe_fit$results[, c("Variables", "Accuracy", "Kappa")]
+rfe_sel
+```
+
+```{r rfe-plot, fig.height=3.5}
+ggplot(rfe_fit$results, aes(Variables, Accuracy)) + geom_line() + geom_point() +
+  geom_vline(xintercept = length(rfe_sel), linetype = "dashed", colour = "red") +
+  labs(title = "RFE: cross-validated accuracy by number of features (training rows)") +
+  theme_minimal()
+```
+
+RFE picks the smallest subset whose cross-validated accuracy is within 1.5% of
+the best, which gives **`r length(rfe_sel)` features**.
+
+```{r sanity}
+auc <- function(score, y) {
+  r <- rank(score); n1 <- sum(y == "Died"); n0 <- sum(y == "Living")
+  (sum(r[y == "Died"]) - n1 * (n1 + 1) / 2) / (n1 * n0)
+}
+yte <- dat$y[te]
+set.seed(5)
+rf_all <- randomForest(x = as.data.frame(Str[, keep_nzv]), y = ytr, ntree = 500)
+rf_sel <- randomForest(x = as.data.frame(Str[, rfe_sel, drop = FALSE]), y = ytr, ntree = 500)
+data.frame(features = c(ncol(Str), length(rfe_sel)),
+           test_AUC = round(c(auc(predict(rf_all, as.data.frame(Ste), type = "prob")[, "Died"], yte),
+                              auc(predict(rf_sel, as.data.frame(Ste[, rfe_sel, drop = FALSE]), type = "prob")[, "Died"], yte)), 3),
+           row.names = c("all columns after near-zero-variance filter", "RFE-selected"))
+```
+
+This is only a sanity check that the pipeline runs end to end on held-out rows
+(the test set has only `r length(te)` patients, so differences of a few points
+mean nothing); the four-model comparison is next week's job.
+
+## Step 5: principal components
+
+PCA is fitted on the **scaled training** features after the correlation filter,
+and the test rows are projected with the same rotation.
+
+```{r pca}
+pca <- prcomp(Str[, keep_corr], center = FALSE, scale. = FALSE)
+ve <- summary(pca)$importance
+round(ve[, 1:6], 3)
+pcs_te <- predict(pca, Ste[, keep_corr])
+load_top <- function(k, n = 8) {
+  l <- pca$rotation[, k]; l[order(-abs(l))][1:n]
+}
+round(load_top(1), 3)
+round(load_top(2), 3)
+```
+
+```{r pca-plot, fig.height=4.5}
+sc <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2], outcome = ytr)
+ggplot(sc, aes(PC1, PC2, colour = outcome)) + geom_point(alpha = 0.7) +
+  stat_ellipse() +
+  labs(title = paste0("Training rows in PC space (PC1 ", round(100 * ve[2, 1], 1),
+                      "%, PC2 ", round(100 * ve[2, 2], 1), "% of variance)")) +
+  theme_minimal()
+```
+
+```{r pca-leak}
+# How much would the rotation change if PCA had been fitted on ALL rows (the leak)?
+S_all <- rbind(Str[, keep_corr], Ste[, keep_corr])
+pca_all <- prcomp(S_all, center = FALSE, scale. = FALSE)
+cos1 <- abs(sum(pca$rotation[, 1] * pca_all$rotation[, 1]))
+cos2 <- abs(sum(pca$rotation[, 2] * pca_all$rotation[, 2]))
+c(cosine_PC1_train_vs_all = round(cos1, 4), cosine_PC2_train_vs_all = round(cos2, 4),
+  test_rows_PC1_mean_trainfit = round(mean(pcs_te[, 1]), 3),
+  test_rows_PC1_mean_allfit = round(mean(predict(pca_all, Ste[, keep_corr])[, 1]), 3))
+```
+
+# 6. Table of removed variables
+
+One row per removed variable: its reason (**domain exclusion**, **leakage
+prevention** or **statistical selection**) and a sentence of justification. The
+statistical sentences are generated from the numbers above.
+
+```{r removed}
+# ---- statistical selection: stage at which each variable's LAST column is removed
+col_stage <- rep("kept", ncol(Etr)); names(col_stage) <- colnames(Etr)
+col_stage[!colnames(Etr) %in% keep_nzv] <- "nzv"
+col_stage[colnames(Etr) %in% corr_drop] <- "correlation"
+col_stage[colnames(Etr) %in% setdiff(keep_corr, ig_keep)] <- "info_gain"
+col_stage[colnames(Etr) %in% setdiff(ig_keep, rfe_sel)] <- "rfe"
+order_st <- c(nzv = 1, correlation = 2, info_gain = 3, rfe = 4)
+
+stat_rows <- do.call(rbind, lapply(unique(col_var), function(v) {
+  cols <- names(col_var)[col_var == v]
+  st <- col_stage[cols]
+  if (any(st == "kept")) return(NULL)               # at least one column survives
+  last <- names(which.max(order_st[st]))
+  cl_last <- cols[st == last]
+  sentence <- switch(last,
+    nzv = {
+      if (v %in% genes) sprintf("Mutated in only %d of %d training patients (%.1f%%), too few events to learn from.",
+                                sum(feat_tr[[v]]), nrow(feat_tr), 100 * mean(feat_tr[[v]]))
+      else sprintf("One value covers %.0f%% of the training patients, so it adds almost no information.",
+                   100 * max(prop.table(table(feat_tr[[v]]))))
+    },
+    correlation = {
+      cc <- cl_last[1]
+      others <- setdiff(keep_corr, cc)
+      rr <- cm[cc, others]; nm <- names(which.max(abs(rr)))
+      sprintf("Correlated r = %.2f with %s, so it repeats information that variable already carries.", rr[nm], nm)
+    },
+    info_gain = {
+      ii <- ig_tab[ig_tab$column %in% cl_last, ]
+      sprintf("Information gain %.4f bits, not above the %.4f bits it reaches with shuffled outcomes, so no real signal.",
+              max(ii$info_gain), ii$null_95[which.max(ii$info_gain)])
+    },
+    rfe = sprintf("Dropped by RFE: the best %d-feature subset scored within 1.5%% of the top cross-validated accuracy without it.", length(rfe_sel)))
+  data.frame(variable = v, reason = "statistical selection",
+             justification = sprintf("%s (stage: %s)", sentence,
+                                     c(nzv = "near-zero variance", correlation = "correlation filter",
+                                       info_gain = "information gain", rfe = "RFE")[last]))
+}))
+
+# ---- domain exclusions and leakage prevention (decided before looking at the data)
+dom <- data.frame(
+  variable = c("PATIENT_ID", "CANCER_TYPE", "SAMPLE_TYPE", "ER_STATUS", "PR_STATUS", "HER2_STATUS",
+               "CANCER_TYPE_DETAILED", "HISTOLOGICAL_SUBTYPE", "ONCOTREE_CODE", "COHORT"),
+  reason = "domain exclusion",
+  justification = c(
+    "A row identifier carries no biology and would let a model memorise patients.",
+    "Every patient has 'Breast Cancer', so it cannot separate anyone.",
+    "Every patient has a 'Primary' sample, so it cannot separate anyone.",
+    "'-' for all 190 patients because TNBC is defined by negative ER, so it is constant by construction.",
+    "'-' for all 190 patients because TNBC is defined by negative PR, so it is constant by construction.",
+    "'-' for all 190 patients because TNBC is defined by negative HER2, so it is constant by construction.",
+    "One of three overlapping histology vocabularies for the same tumours; the labels also differ by cohort coding.",
+    "A second histology vocabulary overlapping the other two; kept out to avoid triple-counting one fact.",
+    "A third histology vocabulary overlapping the other two; kept out to avoid triple-counting one fact.",
+    "Study site and period, not biology; a model could learn 'which cohort' as a shortcut for follow-up length. Used only to help imputation."),
+  stringsAsFactors = FALSE)
+leak <- data.frame(
+  variable = c("OS_MONTHS", "VITAL_STATUS", "CHEMOTHERAPY", "HORMONE_THERAPY", "RADIO_THERAPY"),
+  reason = "leakage prevention",
+  justification = c(
+    "Survival time is the outcome measured another way, and it has far more information gain than any legitimate predictor.",
+    "This is the label itself.",
+    "Decided after the prediction moment, and chosen by clinicians who already judge prognosis.",
+    "Decided after the prediction moment, and chosen by clinicians who already judge prognosis.",
+    "Decided after the prediction moment (and 'YES' for every patient here, so also constant)."),
+  stringsAsFactors = FALSE)
+
+removed <- rbind(dom, leak, stat_rows)
+rownames(removed) <- NULL
+removed <- removed[order(factor(removed$reason, levels = c("domain exclusion", "leakage prevention", "statistical selection"))), ]
+rownames(removed) <- NULL
+table(removed$reason)
+knitr::kable(removed)
+```
+
+```{r kept}
+kept_vars <- setdiff(all_vars, removed$variable)
+```
+
+**Kept after the whole pipeline:** `r length(kept_vars)` of the
+`r length(all_vars)` candidate variables have at least one column in the final
+RFE subset (`r paste(kept_vars, collapse = ", ")`); the selected columns are
+`r paste(rfe_sel, collapse = ", ")`. The other
+`r length(all_vars) - length(kept_vars)` candidates appear in the table above, and
+`r sum(removed$reason != "statistical selection")` more variables were excluded
+before the pipeline by the domain and leakage decisions.
+
+# Is imputing before the split really worse? An experiment
+
+I repeat the whole pipeline on 25 different random 70/30 splits and compare the
+held-out AUC of a random forest in three set-ups:
+
+* **A (correct):** split first; impute and select features using the training rows only.
+* **B (impute first):** impute using all 190 rows *with the outcome in the imputation model*, then split.
+* **C (select first):** split, impute correctly, but choose the top-8 features by information gain using *all* rows, test rows included.
+
+```{r leak-exp, cache=TRUE}
+enc_simple <- function(Xcomp, rows) {
+  f <- Xcomp[, c(numeric_v, ordinal_v, nominal_v)]
+  for (o in ordinal_v) f[[o]] <- as.integer(f[[o]])
+  M <- model.matrix(~ . - 1, data = f)
+  M <- cbind(M, as.matrix(dat[rows, genes]))
+  colnames(M) <- make.names(colnames(M)); M
+}
+ig_cols <- function(M, y) sapply(seq_len(ncol(M)), function(j) ig1(M[, j], y))
+mice_fit <- function(stk, ignore = NULL) {
+  mt <- make.method(stk); mt[] <- ""
+  mt[intersect(numeric_v, names(mt))] <- "pmm"
+  mt[c("GRADE", "CELLULARITY")] <- "polr"; mt["TUMOR_STAGE"] <- stage_method
+  mt[c("ER_IHC", "LATERALITY")] <- "logreg"; mt["THREEGENE"] <- "cart"
+  one <- names(mt)[colSums(is.na(stk)) == 1 & !names(mt) %in% numeric_v]
+  mt[one] <- "cart"
+  mt[colSums(is.na(stk)) == 0] <- ""
+  suppressWarnings(mice::complete(mice(stk, m = 1, maxit = 3, method = mt, ignore = ignore,
+                                       ntrees = 50, printFlag = FALSE, seed = 1), 1))
+}
+run_rep <- function(seed) {
+  set.seed(seed)
+  s <- sample.split(dat$y, SplitRatio = 0.7); tr <- which(s); te <- which(!s)
+  ytr <- dat$y[tr]; yte <- dat$y[te]
+  # A and C: impute with training rows only (outcome NOT in the model)
+  stk <- rbind(X[tr, ], X[te, ]); ig <- c(rep(FALSE, length(tr)), rep(TRUE, length(te)))
+  C1 <- mice_fit(stk, ig)
+  Mtr <- enc_simple(C1[seq_along(tr), ], tr); Mte <- enc_simple(C1[-seq_along(tr), ], te)
+  # A: select on train
+  selA <- order(-ig_cols(Mtr, ytr))[1:8]
+  # C: select on all rows
+  Mall <- rbind(Mtr, Mte); yall <- factor(c(as.character(ytr), as.character(yte)), levels = levels(ytr))
+  selC <- order(-ig_cols(Mall, yall))[1:8]
+  # B: impute on all rows with the outcome as a predictor, then split
+  XB <- X; XB$y <- dat$y
+  CB <- mice_fit(XB)
+  MB <- enc_simple(CB[, setdiff(names(CB), "y")], seq_len(nrow(dat)))
+  selB <- order(-ig_cols(MB[tr, ], ytr))[1:8]
+  fit_auc <- function(Mtrain, Mtest, sel) {
+    rf <- randomForest(x = Mtrain[, sel], y = ytr, ntree = 300)
+    auc(predict(rf, Mtest[, sel], type = "prob")[, "Died"], yte)
+  }
+  c(A = fit_auc(Mtr, Mte, selA), B = fit_auc(MB[tr, ], MB[te, ], selB), C = fit_auc(Mtr, Mte, selC))
+}
+reps <- t(sapply(1:25, run_rep))
+leak_summary <- data.frame(
+  setup = c("A: correct", "B: impute first", "C: select first"),
+  mean_test_AUC = round(colMeans(reps), 4),
+  diff_vs_A = round(colMeans(reps) - mean(reps[, "A"]), 4),
+  se_of_diff = round(c(0, sd(reps[, "B"] - reps[, "A"]), sd(reps[, "C"] - reps[, "A"])) / sqrt(nrow(reps)), 4))
+leak_summary
+```
+
+```{r scale-leak}
+# magnitude of the simplest leak: scaling parameters from all rows vs from training rows
+sl <- data.frame(
+  variable = c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT"),
+  mean_train = sapply(c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT"), function(v) mean(Xc_tr[[v]])),
+  mean_all = sapply(c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT"), function(v) mean(Xc[[v]])),
+  sd_train = sapply(c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT"), function(v) sd(Xc_tr[[v]])))
+sl$mean_shift_in_SDs <- round((sl$mean_all - sl$mean_train) / sl$sd_train, 3)
+sl[, c("variable", "mean_shift_in_SDs")]
+```
+
+# Written answers
+
+## 1. Three reasons for removing a variable
+
+```{r example-pick, include=FALSE}
+ex <- stat_rows[stat_rows$variable == "MEN1", ]
+if (nrow(ex) == 0) ex <- stat_rows[1, ]
+ex_var <- ex$variable[1]; ex_just <- ex$justification[1]
+```
+
+* **Domain exclusion:** `ER_STATUS` (and `PR_STATUS`, `HER2_STATUS`) is `-` for
+  every one of the `r nrow(dat)` patients, because triple-negative disease is
+  *defined* by negative ER, PR and HER2. No data analysis is needed to know that
+  a constant cannot predict anything, and nobody could build a predictor on it.
+* **Leakage prevention:** `OS_MONTHS`. It has an information gain of
+  `r round(ig_compare["OS_MONTHS"], 2)` bits about death from disease against
+  `r round(max(ig_compare[c("NPI", "TUMOR_SIZE", "GRADE", "TUMOR_STAGE", "AGE_AT_DIAGNOSIS", "TP53", "PIK3CA")]), 2)` bits
+  for the best legitimate variable I checked, because survival time and vital
+  status describe the same event. It is not known at the tumour board.
+* **Statistical selection:** for example `r ex_var`:
+  `r ex_just`
+
+**Why three reasons, not one.** They are different kinds of decision, with
+different evidence and different failure modes. Domain exclusion is knowledge
+about what a column *is*, so it is made before looking at outcomes and cannot
+be tuned. Leakage prevention is about **time and causality**: the offending
+variable is the one the statistics like best (`OS_MONTHS` tops the information
+gain table), so a data-driven filter would keep it and only reasoning removes
+it. Statistical selection is the only one that depends on the sample, so it is
+the only one that must be *re-learned inside the training rows*, otherwise it
+leaks too (see the experiment). Merging them into one "feature selection" step
+would let a statistical rule do the job of a clinical judgement, which it
+cannot.
+
+## 2. Why imputation must be learned after the split
+
+An imputation model (a mean, a regression, a forest) is a fitted model like any
+other. If I fit it on all 190 rows, the values filled into the *test* rows are
+computed from training **and test** information, and when the outcome is in the
+imputation model, partly from the test patients' own outcomes. The test set then
+stops being unseen data, so the held-out score is too good.
+
+What goes wrong, concretely: a missing stage in a test patient is filled using a
+model that has seen that patient's neighbours' labels and that patient's own
+outcome, which can make a test case look easier than a new patient will be at
+the bedside.
+
+**How large is the error here?** I expected it to be small for imputation and
+larger for anything that chooses things using the outcome. Measured over 25
+random splits, held-out AUC was `r leak_summary$mean_test_AUC[1]` with the
+correct pipeline, `r leak_summary$mean_test_AUC[2]` when I imputed first
+(difference `r leak_summary$diff_vs_A[2]`, standard error
+`r leak_summary$se_of_diff[2]`) and `r leak_summary$mean_test_AUC[3]` when I
+selected features on all rows (difference `r leak_summary$diff_vs_A[3]`,
+standard error `r leak_summary$se_of_diff[3]`).
+
+* `r if (abs(leak_summary$diff_vs_A[2]) < 2 * leak_summary$se_of_diff[2]) "**Imputation:** the leak is within noise here. Only a few percent of the cells are missing, so there is little for it to leak into, and the standardising leak moves the means by at most " else "**Imputation:** the leak is large enough to see here, and the standardising leak moves the means by at most "` `r max(abs(sl$mean_shift_in_SDs))` standard deviations.
+* **Feature selection:** this is the leak that matters here. Choosing the
+  top-8 features with all rows inflated the AUC by about
+  `r leak_summary$diff_vs_A[3]`, roughly `r round(leak_summary$diff_vs_A[3] / leak_summary$se_of_diff[3])` standard errors, and an
+  inflation of that size is bigger than the differences between models I would
+  be trying to detect next week. It grows with the number of candidate features
+  (here 33 for 133 training rows).
+
+So the penalty for imputing first is small *in this dataset*, but I cannot know
+that in advance, the correct order costs nothing, and for selection the
+penalty is real.
+
+## 3. Imputing tumour grade (or stage) as if continuous
+
+Grade and stage are **ordered categories**, not measurements. The distance from
+grade 1 to grade 2 is not the same kind of quantity as from 2 to 3, and "grade
+2.4" is not a grade. A continuous imputer fills gaps with values like 2.4
+or 1.8; in my masking experiment `r round(100 * mask_summary$share_non_integer[mask_summary$method == "treated as continuous (norm)"])`% of the guessed stages were not whole numbers, and rounding them back
+gave an exact match rate of only
+`r round(100 * mask_summary$exact_match[mask_summary$method == "treated as continuous (norm)"])`%,
+**worse than always guessing the most common stage**
+(`r round(100 * mask_summary$exact_match[mask_summary$method == "most common level"])`%). Treating the ordered stage as a category
+did better: `r round(100 * mask_summary$exact_match[mask_summary$method == "mice rf (random forest)"])`% with `mice` random forests,
+`r round(100 * mask_summary$exact_match[mask_summary$method == "mice polr (ordered factor)"])`% with `mice` proportional-odds (`polr`) and
+`r round(100 * mask_summary$exact_match[mask_summary$method == "missForest"])`% with `missForest`. The `polr` result is not impressive: with
+only about a hundred observed stages and many predictors, a proportional-odds
+model does *worse* than guessing the mode
+(`r round(100 * mask_summary$exact_match[mask_summary$method == "mice polr (ordered factor)"])`% against
+`r round(100 * mask_summary$exact_match[mask_summary$method == "most common level"])`%), which is why I did not use it for stage. (Grade is the same kind of variable; stage is the one with enough gaps to
+test.)
+
+* **mice** fills each variable from its own model chosen for the variable's
+  type (here: predictive mean matching, proportional-odds regression, logistic
+  regression, classification trees) and draws from a predictive distribution,
+  so it gives *several* completed datasets and expresses imputation
+  uncertainty. It assumes data are **missing at random** given the variables in
+  the model, and that each of those conditional models is reasonable.
+* **missForest** fits a random forest for each variable and iterates. It
+  assumes missing at random too, but makes **no** distributional or linearity
+  assumption, so it copes with interactions and mixed types, at the price of
+  giving one imputed value per gap (no uncertainty) and no way to fill new rows
+  from a stored model.
+
+**My choices:** `pmm` for the numeric variable with gaps (`TUMOR_SIZE`; it only
+returns observed values, so no impossible sizes); `rf` inside `mice` for
+`TUMOR_STAGE` (ordered, 46 gaps, the best method I could test that fits the
+split-first rule); `polr` for `GRADE` and `CELLULARITY` (ordered, only 2 and 6
+gaps, too few to test); `logreg` for `ER_IHC` and `LATERALITY` (two levels);
+`cart` for `THREEGENE` (sparse, four levels, where a regression is unstable).
+`missForest` scored higher on stage, but I chose `mice` throughout because it can
+be fitted on the training rows and then applied to the test rows via `ignore`,
+and because it gives five completed datasets. Those five agree on only
+`r round(100 * agree["TUMOR_STAGE"])`% of the imputed stages, so the imputed
+stage is uncertain, which is one reason I am not surprised that stage did not
+survive the selection steps.
+
+## 4. Principal components
+
+PC1 captures `r round(100 * ve[2, 1], 1)`% and PC2 `r round(100 * ve[2, 2], 1)`%
+of the variance in the scaled training features, so together
+`r round(100 * ve[3, 2], 1)`%; the spread is flat, and it takes
+`r which(ve[3, ] >= 0.8)[1]` components to reach 80%.
+The largest PC1 loadings are `r paste(names(load_top(1, 5)), collapse = ", ")`
+and the largest PC2 loadings are `r paste(names(load_top(2, 4)), collapse = ", ")`.
+Reading them: PC1 mixes ER immunohistochemistry, integrative cluster 10 versus 4ER+,
+grade, cellularity and TP53 in the directions you would expect of an aggressive
+ER-negative, basal-like tumour, so I read it as a **tumour-biology axis**; PC2 is
+dominated by stage, NPI, mastectomy and tumour size, a **disease-extent axis**.
+Neither is a clinical quantity on its own, and the first two together hold only
+`r round(100 * ve[3, 2], 1)`% of the variance, so PCA does not compress this data much.
+
+* **Why scale first:** PCA chases variance, and variance depends on units. Age
+  (years, SD about `r round(sd(Xc_tr$AGE_AT_DIAGNOSIS))`) would swamp a 0/1 mutation flag purely because of its
+  scale, and the "components" would just be the largest-unit variables.
+* **Why PCA before the split leaks:** the rotation is computed from the covariance
+  of the data. If the test rows are in that calculation, the axes are chosen
+  partly to describe the test patients, so projecting them is not a fair
+  out-of-sample step. Here PC1 barely moves (cosine between the training-only and
+  all-rows axis is `r round(cos1, 3)`) but PC2 rotates more (`r round(cos2, 3)`),
+  so the axes really do depend on which rows were used, and fitting them on all
+  rows would quietly make the test rows part of the definition of the features.
+* **At the bedside?** No. PC1 is a weighted sum of `r length(keep_corr)` standardised variables,
+  including genomic ones, each scaled with the *training* cohort's mean and SD.
+  A clinician cannot compute it, cannot explain it to a patient, and a change in
+  any input changes it in a way nobody can read off. A variable-level rule or a
+  short score built from a handful of named inputs can be used; a PC score cannot.
+
+## 5. What we owe the patients
+
+Every row is somebody's illness and, in the cases here, often their death.
+Being public and de-identified lowers the risk but does not remove the duty.
+
+* **Do not try to re-identify anyone,** and do not link these rows to any other
+  data source. Age at diagnosis, tumour size, cohort and a rare mutation can
+  together narrow a patient to one person (the `CTNNA1` and `LDLRAP1` mutations
+  are each found in a single patient).
+* **Report in ways that cannot expose small groups:** I would not publish or
+  circulate tables or plots of groups of one or two patients with a rare combination.
+* **Use the data for the purpose it was shared for** (research on breast cancer),
+  and describe what the model can and cannot do honestly. It was fitted on
+  `r length(tr)` patients, one set of cohorts and an era with different
+  treatments, and "Living" includes people with short follow-up, so it is not
+  evidence about any individual's future.
+
+**What I would refuse to do, even though nothing technically stops me:**
+use this data (or a model built from it) to decide whether an *individual*
+patient gets a treatment, an insurance product or access to care, or to try to
+work out which real person a row belongs to. A prediction model that has not
+been validated prospectively, with clinicians, on a different population should
+not make or justify decisions about people.
