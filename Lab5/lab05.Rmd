@@ -1,0 +1,541 @@
+---
+title: "Lab 5: Four Models on TNBC and a Clinical Recommendation"
+author: "Bright Joses"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+> **AI use statement.** This submission was produced with substantial help from
+> Claude, an AI assistant made by Anthropic. Claude wrote the R code, ran the
+> analyses and drafted the recommendation, written answers and tables in this
+> file. It was not used only to explain a concept or an error message. All
+> results come from running the code in this file on the supplied TNBC data.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+suppressPackageStartupMessages({
+  library(mice); library(caret); library(randomForest); library(rpart)
+  library(rpart.plot); library(kernlab); library(caTools); library(ggplot2)
+})
+options(width = 110)
+```
+
+# 0. The task and the Lab 4 pipeline
+
+**Prediction task (as in Lab 4):** will this TNBC patient die of disease? The
+prediction is made at the tumour board after surgery and tumour profiling,
+before adjuvant therapy is decided. The positive class is **Died**.
+
+This section rebuilds the Lab 4 pipeline with the same seeds: split first,
+`mice` fitted on the training rows only (a random forest for tumour stage, which
+won the masking experiment in Lab 4), then encoding, near-zero-variance filter,
+training-only scaling, correlation filter, information gain and RFE.
+
+```{r pipeline-data}
+cl <- read.csv("tnbc_clinical.csv", na.strings = c("NA", ""), check.names = FALSE,
+               stringsAsFactors = FALSE)
+mu <- read.csv("tnbc_mutation.csv", check.names = FALSE)
+names(cl)[1] <- "PATIENT_ID"; names(mu)[1] <- "PATIENT_ID"
+genes <- setdiff(names(mu), "PATIENT_ID")
+dat <- merge(cl, mu, by = "PATIENT_ID", sort = FALSE)
+dat$y <- factor(ifelse(dat$VITAL_STATUS == "Died of Disease", "Died", "Living"),
+                levels = c("Living", "Died"))
+
+clean_lv <- function(f, signs = FALSE) {
+  lv <- levels(f)
+  if (signs) lv <- gsub("-", "neg", gsub("\\+", "pos", lv))
+  levels(f) <- gsub("[^A-Za-z0-9]+", "_", lv); f
+}
+typed <- function(d) {
+  out <- data.frame(
+    AGE_AT_DIAGNOSIS = as.numeric(d$AGE_AT_DIAGNOSIS), NPI = as.numeric(d$NPI),
+    TUMOR_SIZE = as.numeric(d$TUMOR_SIZE), MUTATION_COUNT = as.numeric(d$MUTATION_COUNT),
+    GRADE = factor(ifelse(is.na(d$GRADE), NA, ifelse(d$GRADE == 3, "3", "1-2")),
+                   levels = c("1-2", "3"), ordered = TRUE),
+    TUMOR_STAGE = factor(ifelse(is.na(d$TUMOR_STAGE), NA,
+                                ifelse(d$TUMOR_STAGE <= 1, "0-1", as.character(d$TUMOR_STAGE))),
+                         levels = c("0-1", "2", "3"), ordered = TRUE),
+    CELLULARITY = factor(d$CELLULARITY, levels = c("low", "moderate", "high"), ordered = TRUE),
+    ER_IHC = factor(d$ER_IHC), LATERALITY = factor(d$LATERALITY),
+    BREAST_SURGERY = factor(d$BREAST_SURGERY),
+    INFERRED_MENOPAUSAL_STATE = factor(d$INFERRED_MENOPAUSAL_STATE),
+    CLAUDIN_SUBTYPE = factor(d$CLAUDIN_SUBTYPE), HER2_SNP6 = factor(d$HER2_SNP6),
+    INTCLUST = factor(d$INTCLUST), THREEGENE = factor(d$THREEGENE),
+    COHORT = factor(d$COHORT))
+  out$INTCLUST  <- clean_lv(out$INTCLUST, signs = TRUE)
+  out$THREEGENE <- clean_lv(out$THREEGENE, signs = TRUE)
+  out$CLAUDIN_SUBTYPE <- clean_lv(out$CLAUDIN_SUBTYPE)
+  out$BREAST_SURGERY  <- clean_lv(out$BREAST_SURGERY)
+  out
+}
+numeric_v <- c("AGE_AT_DIAGNOSIS", "NPI", "TUMOR_SIZE", "MUTATION_COUNT")
+ordinal_v <- c("GRADE", "TUMOR_STAGE", "CELLULARITY")
+nominal_v <- c("BREAST_SURGERY", "INFERRED_MENOPAUSAL_STATE", "LATERALITY", "ER_IHC",
+               "CLAUDIN_SUBTYPE", "HER2_SNP6", "INTCLUST", "THREEGENE")
+X <- typed(dat)
+
+set.seed(2026)
+s  <- sample.split(dat$y, SplitRatio = 0.7)
+tr <- which(s); te <- which(!s)
+ytr <- dat$y[tr]; yte <- dat$y[te]
+rbind(train = table(ytr), test = table(yte))
+```
+
+```{r pipeline-impute, cache=TRUE}
+st   <- rbind(X[tr, ], X[te, ])
+ign  <- c(rep(FALSE, length(tr)), rep(TRUE, length(te)))
+meth <- make.method(st); meth[] <- ""
+meth[numeric_v] <- "pmm"
+meth[c("GRADE", "CELLULARITY")] <- "polr"
+meth["TUMOR_STAGE"] <- "rf"
+meth[c("ER_IHC", "LATERALITY")] <- "logreg"
+meth["THREEGENE"] <- "cart"
+meth[colSums(is.na(st)) == 0] <- ""
+imp <- suppressWarnings(mice(st, m = 5, maxit = 10, method = meth, ntrees = 100,
+                             predictorMatrix = make.predictorMatrix(st),
+                             ignore = ign, seed = 1, printFlag = FALSE))
+Xc <- mice::complete(imp, 1)
+```
+
+```{r pipeline-features, cache=TRUE, dependson="pipeline-impute"}
+make_feat <- function(Xcomp, rows) {
+  f <- Xcomp[, c(numeric_v, ordinal_v, nominal_v)]
+  for (o in ordinal_v) f[[o]] <- as.integer(f[[o]])
+  cbind(f, dat[rows, genes])
+}
+feat_tr <- make_feat(Xc[seq_along(tr), ], tr)
+feat_te <- make_feat(Xc[-seq_along(tr), ], te)
+dv  <- dummyVars(~ ., data = feat_tr, fullRank = TRUE)
+Etr <- predict(dv, feat_tr); Ete <- predict(dv, feat_te)
+colnames(Etr) <- colnames(Ete) <- make.names(colnames(Etr), unique = TRUE)
+nz <- nearZeroVar(Etr, saveMetrics = TRUE)
+keep_nzv <- rownames(nz)[!nz$nzv]
+pp  <- preProcess(Etr[, keep_nzv], method = c("center", "scale"))
+Str <- predict(pp, Etr[, keep_nzv]); Ste <- predict(pp, Ete[, keep_nzv])
+cm <- cor(Str)
+drop_derived <- if (abs(cm["AGE_AT_DIAGNOSIS", "INFERRED_MENOPAUSAL_STATE.pre"]) > 0.8)
+  "INFERRED_MENOPAUSAL_STATE.pre" else character(0)
+rest <- setdiff(colnames(cm), drop_derived)
+corr_drop <- c(drop_derived, findCorrelation(cm[rest, rest], cutoff = 0.8, names = TRUE))
+keep_corr <- setdiff(colnames(Str), corr_drop)
+
+H <- function(p) { p <- p[p > 0]; -sum(p * log2(p)) }
+ig1 <- function(x, y) {
+  if (is.numeric(x) && length(unique(x)) > 2) {
+    br <- unique(quantile(x, 0:4 / 4, na.rm = TRUE)); x <- cut(x, br, include.lowest = TRUE)
+  }
+  tab <- table(x, y); px <- rowSums(tab) / sum(tab)
+  H(prop.table(table(y))) - sum(px * apply(tab, 1, function(r) H(r / sum(r))))
+}
+ig_vec <- function(M, y) sapply(seq_len(ncol(M)), function(j) ig1(M[, j], y))
+set.seed(11)
+M <- Etr[, keep_corr, drop = FALSE]
+ig_real <- ig_vec(M, ytr)
+null <- replicate(300, ig_vec(M, sample(ytr)))
+ig_pass <- ig_real > apply(null, 1, quantile, probs = 0.95)
+ig_keep <- colnames(M)[ig_pass][order(-ig_real[ig_pass])]   # same column order as Lab 4
+
+set.seed(13)
+xr <- as.data.frame(Str[, ig_keep, drop = FALSE])
+sizes <- sort(unique(pmin(c(2, 3, 4, 5, 6, 8, 10, 12, 15, 20), ncol(xr))))
+rfe_fit <- rfe(x = xr, y = ytr, sizes = sizes, ntree = 300,
+               rfeControl = rfeControl(functions = rfFuncs, method = "repeatedcv",
+                                       number = 5, repeats = 3))
+feats <- predictors(rfe_fit)
+Atr <- as.data.frame(Str[, feats, drop = FALSE]); Ate <- as.data.frame(Ste[, feats, drop = FALSE])
+```
+
+```{r pipeline-check}
+feats
+```
+
+Features were chosen on the training rows only. RFE ranks them with random
+forests, which could give the forest a small advantage in this comparison, and I
+keep that in mind below.
+
+# 1. Four models on the same training data
+
+All four see the same five features, the same rows and the **same 5-fold, 5-repeat
+cross-validation folds**. Each is tuned by cross-validated ROC-AUC on the training
+rows. The test rows are used once, at the end.
+
+```{r fit, cache=TRUE, dependson="pipeline-features"}
+set.seed(100)
+folds <- createMultiFolds(ytr, k = 5, times = 5)
+ctrl <- trainControl(method = "repeatedcv", index = folds, classProbs = TRUE,
+                     summaryFunction = twoClassSummary, savePredictions = "final")
+set.seed(101)
+m_glm <- train(x = Atr, y = ytr, method = "glm", family = binomial(), metric = "ROC", trControl = ctrl)
+set.seed(101)
+m_tree <- train(x = Atr, y = ytr, method = "rpart", metric = "ROC", trControl = ctrl,
+                tuneGrid = data.frame(cp = c(0.001, 0.01, 0.02, 0.03, 0.05, 0.1)))
+set.seed(101)
+m_rf <- train(x = Atr, y = ytr, method = "rf", metric = "ROC", trControl = ctrl,
+              tuneGrid = data.frame(mtry = 1:4), ntree = 500)
+set.seed(101)
+sig <- as.numeric(sigest(as.matrix(Atr), scaled = FALSE)[2])
+m_svm <- train(x = Atr, y = ytr, method = "svmRadial", metric = "ROC", trControl = ctrl,
+               tuneGrid = expand.grid(sigma = sig, C = 2^(-2:4)))
+models <- list("Logistic regression" = m_glm, "Decision tree" = m_tree,
+               "Random forest" = m_rf, "SVM (radial)" = m_svm)
+```
+
+```{r tuning}
+lapply(models[-1], function(m) m$bestTune)
+```
+
+## Cross-validated performance on the training rows
+
+This is what I use to **choose** a model. The test table below is for
+**reporting**; choosing the winner from test scores would make its test score
+optimistic.
+
+```{r cv-table}
+cv_tab <- do.call(rbind, lapply(names(models), function(n) {
+  r <- models[[n]]$resample
+  data.frame(model = n, cv_ROC_AUC = mean(r$ROC), cv_ROC_sd = sd(r$ROC))
+}))
+cv_tab[, -1] <- round(cv_tab[, -1], 3)
+cv_tab[order(-cv_tab$cv_ROC_AUC), ]
+```
+
+# 2. Metrics table on the same test data
+
+Every metric is written from the predicted probabilities in base R.
+
+```{r metrics-fns}
+confusion <- function(p, y, thr = 0.5) {
+  pred <- p >= thr; pos <- y == "Died"
+  c(TP = sum(pred & pos), FP = sum(pred & !pos), TN = sum(!pred & !pos), FN = sum(!pred & pos))
+}
+safe <- function(a, b) if (b == 0) 0 else a / b
+roc_auc <- function(p, y) {                      # P(random positive ranks above random negative)
+  r <- rank(p); n1 <- sum(y == "Died"); n0 <- sum(y == "Living")
+  (sum(r[y == "Died"]) - n1 * (n1 + 1) / 2) / (n1 * n0)
+}
+pr_curve <- function(p, y, w_neg = 1) {          # one point per distinct score, ties handled together
+  th <- sort(unique(p), decreasing = TRUE)
+  pos <- y == "Died"
+  do.call(rbind, lapply(th, function(t) {
+    tp <- sum(p >= t & pos); fp <- w_neg * sum(p >= t & !pos)
+    data.frame(thr = t, recall = tp / sum(pos), precision = tp / (tp + fp),
+               fpr = sum(p >= t & !pos) / sum(!pos))
+  }))
+}
+pr_auc <- function(p, y, w_neg = 1) {            # average precision: sum of precision x recall step
+  k <- pr_curve(p, y, w_neg)
+  sum(diff(c(0, k$recall)) * k$precision)
+}
+all_metrics <- function(p, y, thr = 0.5) {
+  m <- confusion(p, y, thr); TP <- m[["TP"]]; FP <- m[["FP"]]; TN <- m[["TN"]]; FN <- m[["FN"]]
+  sens <- safe(TP, TP + FN); spec <- safe(TN, TN + FP)
+  c(accuracy = (TP + TN) / sum(m), balanced_accuracy = (sens + spec) / 2,
+    sensitivity = sens, specificity = spec, F1 = safe(2 * TP, 2 * TP + FP + FN),
+    ROC_AUC = roc_auc(p, y), PR_AUC = pr_auc(p, y))
+}
+```
+
+```{r test-table}
+probs <- lapply(models, function(m) predict(m, Ate, type = "prob")[, "Died"])
+base_p <- rep(mean(ytr == "Died"), length(yte))   # majority-class baseline: always "Living"
+probs_all <- c(list("Majority-class baseline" = base_p), probs)
+metric_mat <- t(sapply(probs_all, all_metrics, y = yte))
+knitr::kable(round(metric_mat, 3), caption = "Test set, threshold 0.5. Positive class = Died.")
+conf_mat <- t(sapply(probs_all, confusion, y = yte))
+knitr::kable(conf_mat, caption = "Confusion counts on the test set")
+prev <- mean(yte == "Died"); n_test <- length(yte)
+c(test_patients = n_test, died = sum(yte == "Died"), prevalence = round(prev, 3))
+```
+
+## How uncertain are these numbers?
+
+The test set is small, so I bootstrap the test patients 2,000 times.
+
+```{r boot, cache=TRUE, dependson="fit"}
+set.seed(200)
+idx <- replicate(2000, sample(seq_along(yte), replace = TRUE))
+idx <- idx[, apply(idx, 2, function(i) length(unique(yte[i])) == 2)]
+bs <- lapply(probs, function(p) apply(idx, 2, function(i)
+  c(ROC = roc_auc(p[i], yte[i]), PR = pr_auc(p[i], yte[i]))))
+ci <- do.call(rbind, lapply(names(bs), function(n) {
+  q <- apply(bs[[n]], 1, quantile, c(0.025, 0.975))
+  data.frame(model = n, ROC_low = q[1, "ROC"], ROC_high = q[2, "ROC"],
+             PR_low = q[1, "PR"], PR_high = q[2, "PR"])
+}))
+rownames(ci) <- NULL
+```
+
+```{r boot-show}
+best_cv <- cv_tab$model[which.max(cv_tab$cv_ROC_AUC)]
+ci[, -1] <- round(ci[, -1], 3)
+knitr::kable(ci, caption = "95% bootstrap intervals on the test set")
+diffs <- do.call(rbind, lapply(setdiff(names(probs), best_cv), function(n) {
+  d <- bs[[best_cv]]["ROC", ] - bs[[n]]["ROC", ]
+  data.frame(comparison = paste(best_cv, "minus", n), mean_diff_ROC = mean(d),
+             low = unname(quantile(d, 0.025)), high = unname(quantile(d, 0.975)))
+}))
+diffs[, -1] <- round(diffs[, -1], 3)
+knitr::kable(diffs, caption = "Paired ROC-AUC differences against the model chosen by cross-validation")
+```
+
+## ROC and precision-recall curves
+
+```{r curves, fig.width=8, fig.height=4}
+curve_df <- do.call(rbind, lapply(names(probs), function(n) {
+  k <- pr_curve(probs[[n]], yte); data.frame(model = n, k)
+}))
+roc_df <- do.call(rbind, lapply(split(curve_df, curve_df$model), function(d)
+  rbind(data.frame(model = d$model[1], fpr = 0, recall = 0), d[, c("model", "fpr", "recall")])))
+ggplot(roc_df, aes(fpr, recall, colour = model)) + geom_line() +
+  geom_abline(linetype = "dashed", colour = "grey50") +
+  labs(title = "ROC curves (test)", x = "False positive rate", y = "Sensitivity") + theme_minimal()
+ggplot(curve_df, aes(recall, precision, colour = model)) + geom_step() +
+  geom_hline(yintercept = prev, linetype = "dashed", colour = "grey50") +
+  labs(title = "Precision-recall curves (test); dashed line = prevalence",
+       x = "Recall (sensitivity)", y = "Precision (PPV)") + ylim(0, 1) + theme_minimal()
+```
+
+## What happens to ROC-AUC and PR-AUC if the disease is rarer?
+
+I re-weight the test patients who lived so that deaths make up 5% of the
+population. Sensitivity and specificity do not change; precision does.
+
+```{r rare}
+w5 <- (sum(yte == "Died") * 0.95 / 0.05) / sum(yte == "Living")   # weight per survivor
+rare_tab <- t(sapply(probs, function(p) c(
+  ROC_AUC_at_test_prev = roc_auc(p, yte), ROC_AUC_at_5pct = roc_auc(p, yte),
+  PR_AUC_at_test_prev = pr_auc(p, yte), PR_AUC_at_5pct = pr_auc(p, yte, w_neg = w5))))
+knitr::kable(round(rare_tab, 3))
+```
+
+## A threshold chosen for sensitivity (on training data only)
+
+A threshold of 0.5 is arbitrary. For each model I take the **out-of-fold**
+training predictions and choose the highest threshold that still catches at
+least 85% of the deaths, then apply it unchanged to the test set.
+
+```{r threshold}
+pick_thr <- function(m, target = 0.85) {
+  d <- m$pred
+  d <- aggregate(Died ~ rowIndex + obs, data = d, FUN = mean)   # average over repeats
+  th <- sort(unique(d$Died), decreasing = TRUE)
+  sens <- sapply(th, function(t) mean(d$Died[d$obs == "Died"] >= t))
+  th[which(sens >= target)[1]]
+}
+thr <- sapply(models, pick_thr)
+thr_tab <- t(sapply(names(models), function(n) {
+  mm <- confusion(probs[[n]], yte, thr[[n]]); a <- all_metrics(probs[[n]], yte, thr[[n]])
+  c(threshold = thr[[n]], sensitivity = a[["sensitivity"]], specificity = a[["specificity"]],
+    PPV = safe(mm[["TP"]], mm[["TP"]] + mm[["FP"]]), missed_deaths = mm[["FN"]], false_alarms = mm[["FP"]])
+}))
+knitr::kable(round(thr_tab, 3), caption = "Test results at the sensitivity-targeted thresholds")
+```
+
+# Interpretability: what do the simple models say?
+
+```{r interpret, fig.height=4}
+co <- summary(m_glm$finalModel)$coefficients
+or_tab <- data.frame(term = rownames(co), odds_ratio_per_SD = exp(co[, 1]),
+                     low = exp(co[, 1] - 1.96 * co[, 2]), high = exp(co[, 1] + 1.96 * co[, 2]),
+                     p_value = co[, 4], row.names = NULL)
+or_tab[, -1] <- round(or_tab[, -1], 3)
+knitr::kable(or_tab, caption = "Logistic regression: odds ratios per 1 SD (binary features are standardised too)")
+rpart.plot(m_tree$finalModel, type = 4, extra = 104, roundint = FALSE,
+           main = "Decision tree (splits are in standardised units)")
+varImp(m_rf)$importance
+```
+
+```{r separation}
+table(SHANK2_mutated = feat_tr$SHANK2, outcome = ytr)
+```
+
+The `SHANK2` odds ratio has an impossibly wide interval because of
+**quasi-separation**: look at the table above. That coefficient should not be read
+or quoted. `BREAST_SURGERY` (mastectomy) probably stands for tumour extent (bigger
+or more advanced tumours more often need mastectomy), so it is not a reason to
+operate differently.
+
+# 3. Recommendation
+
+```{r rec-numbers, include=FALSE}
+f2 <- function(x) sprintf("%.2f", x)
+cvv <- setNames(cv_tab$cv_ROC_AUC, cv_tab$model)
+lr <- "Logistic regression"
+lt <- thr_tab[lr, ]
+```
+
+**Use logistic regression, only to prompt discussion, never to decide
+treatment.** Cross-validation cannot separate the top models (ROC-AUC
+`r f2(cvv["Random forest"])` random forest, `r f2(cvv["SVM (radial)"])` SVM,
+`r f2(cvv[lr])` logistic; gaps under one standard deviation), so I prefer the one
+a clinician can inspect. Its test ROC-AUC (`r f2(metric_mat[lr, "ROC_AUC"])`) and
+PR-AUC (`r f2(metric_mat[lr, "PR_AUC"])`) were also highest, though intervals
+overlap.
+
+**Metric:** sensitivity, always beside specificity. At a training-chosen
+threshold it caught `r sum(yte == "Died") - lt[["missed_deaths"]]` of
+`r sum(yte == "Died")` deaths but flagged `r lt[["false_alarms"]]` of
+`r sum(yte == "Living")` survivors (specificity `r f2(lt[["specificity"]])`, PPV
+`r f2(lt[["PPV"]])` against prevalence `r f2(prev)`). That is little better than
+calling everyone high risk, so it must not justify withholding or reducing
+therapy.
+
+**What would change my mind:** a larger external cohort where another model beats
+it in paired ROC-AUC or PR-AUC with an interval excluding zero; specificity of at
+least 0.50 at 85% sensitivity; and good calibration. Until then, none of these
+models is ready for clinical use.
+
+# Written answers
+
+## 1. Why accuracy misleads here
+
+```{r q1, include=FALSE}
+acc_base <- metric_mat["Majority-class baseline", "accuracy"]
+best_acc_name <- rownames(metric_mat)[-1][which.max(metric_mat[-1, "accuracy"])]
+best_acc <- metric_mat[best_acc_name, "accuracy"]
+extra <- round((best_acc - acc_base) * n_test)
+```
+
+The baseline that predicts "Living" for everyone scores
+**`r round(100 * acc_base, 1)`% accuracy** on the test set
+(`r sum(yte == "Living")` of `r n_test`) while catching **0 of
+`r sum(yte == "Died")` deaths** (sensitivity 0, balanced accuracy 0.50, F1 0). The
+highest accuracy of my four models is the `r best_acc_name`'s
+`r round(100 * best_acc, 1)`%, which sounds respectable but is only
+`r round(100 * (best_acc - acc_base), 1)` points, about **`r extra` more patients**,
+above doing nothing. It still misses `r conf_mat[best_acc_name, "FN"]` of the
+`r sum(yte == "Died")` deaths (sensitivity `r f2(metric_mat[best_acc_name, "sensitivity"])`).
+Logistic regression is worse on accuracy
+(`r round(100 * metric_mat[lr, "accuracy"], 1)`%, only
+`r round((metric_mat[lr, "accuracy"] - acc_base) * n_test)` patients above the
+baseline). The tree and the forest have identical confusion matrices at 0.5 and so
+identical accuracy, yet different ROC-AUC
+(`r f2(metric_mat["Decision tree", "ROC_AUC"])` against
+`r f2(metric_mat["Random forest", "ROC_AUC"])`): accuracy cannot even see that.
+Accuracy mixes the two kinds of error, weighs them equally, depends on the class
+mix and on one arbitrary threshold. Balanced accuracy, sensitivity and
+specificity show what is hidden.
+
+## 2. ROC-AUC against PR-AUC
+
+ROC-AUC compares sensitivity with the false-positive rate. Both are calculated
+*within* a true class, so ROC-AUC **does not change with prevalence**, and its
+chance level is always 0.50. PR-AUC uses precision, which depends on how many
+negatives there are, so its chance level **is the prevalence**. They disagree
+mainly when the positive class is rare: many false positives barely move the
+false-positive rate but wreck precision.
+
+On my test set the death rate is `r round(100 * prev, 1)`%, close to balanced, and
+the two **agree on the ranking**: logistic regression
+(ROC `r f2(metric_mat[lr, "ROC_AUC"])`, PR `r f2(metric_mat[lr, "PR_AUC"])`), then
+SVM (`r f2(metric_mat["SVM (radial)", "ROC_AUC"])`,
+`r f2(metric_mat["SVM (radial)", "PR_AUC"])`), random forest
+(`r f2(metric_mat["Random forest", "ROC_AUC"])`,
+`r f2(metric_mat["Random forest", "PR_AUC"])`) and tree
+(`r f2(metric_mat["Decision tree", "ROC_AUC"])`,
+`r f2(metric_mat["Decision tree", "PR_AUC"])`). Remember the baselines: 0.50 for
+ROC and `r f2(prev)` for PR. When I re-weight to 5% prevalence, ROC-AUC is
+unchanged but PR-AUC falls to `r f2(rare_tab[lr, "PR_AUC_at_5pct"])` for logistic
+regression and `r f2(min(rare_tab[, "PR_AUC_at_5pct"]))`-`r f2(sort(rare_tab[, "PR_AUC_at_5pct"], decreasing = TRUE)[2])` for the others, and the tree and
+forest swap places.
+
+**Which to trust:** the question is about the patients who die, so I give more
+weight to **PR-AUC read against its prevalence baseline**, and especially if the
+model were used where deaths are rarer than in this cohort. At this cohort's
+prevalence they tell the same story. Neither is precise: with
+`r sum(yte == "Died")` deaths the 95% interval for logistic PR-AUC is
+`r ci$PR_low[ci$model == lr]`-`r ci$PR_high[ci$model == lr]`. The 5% figures rest on
+very few top-ranked patients, so treat them as an illustration.
+
+## 3. What the two errors mean for a patient
+
+* **False negative:** a patient who will die of the disease is called low risk.
+  The board might lean towards less intensive therapy or less follow-up, and the
+  patient may lose the chance of treatment escalation or a clinical trial. The
+  harm can be irreversible.
+* **False positive:** a patient who would survive is called high risk. They may
+  receive more intensive treatment than they need, with real harms (infection from
+  low blood counts, nerve damage, heart toxicity from some drugs), plus anxiety
+  and cost. Some harm is lasting, but it does not by itself leave a cancer
+  under-treated.
+
+**I would report sensitivity first**, at a threshold fixed before looking at the
+test data, and **never without specificity** next to it, because sensitivity of
+100% is free if you call everyone high risk. For a patient the next number is the
+predictive value *at the local prevalence* (question 4). AUCs are for comparing
+models; they do not tell a clinician what happens to the person in front of them.
+
+## 4. Positive predictive value at two prevalences
+
+By Bayes' rule, PPV = (sens x prev) / (sens x prev + (1 - spec) x (1 - prev)).
+
+```{r ppv}
+ppv <- function(se, sp, pr) se * pr / (se * pr + (1 - sp) * (1 - pr))
+npv <- function(se, sp, pr) sp * (1 - pr) / (sp * (1 - pr) + (1 - se) * pr)
+pts <- list("threshold 0.5" = all_metrics(probs[[lr]], yte, 0.5),
+            "sensitivity-targeted threshold" = all_metrics(probs[[lr]], yte, thr[[lr]]))
+ppv_tab <- do.call(rbind, lapply(names(pts), function(n) {
+  se <- pts[[n]][["sensitivity"]]; sp <- pts[[n]][["specificity"]]
+  data.frame(operating_point = n, sensitivity = se, specificity = sp,
+             PPV_at_data_prevalence = ppv(se, sp, mean(dat$y == "Died")),
+             PPV_at_5pct = ppv(se, sp, 0.05),
+             NPV_at_data_prevalence = npv(se, sp, mean(dat$y == "Died")),
+             NPV_at_5pct = npv(se, sp, 0.05))
+}))
+ppv_tab[, -1] <- round(ppv_tab[, -1], 3)
+knitr::kable(ppv_tab, caption = "Logistic regression: predictive values (data prevalence = all 190 patients)")
+```
+
+The prevalence in my data is `r round(100 * mean(dat$y == "Died"), 1)`% (83 of
+190). At the sensitivity-targeted threshold the PPV is
+**`r ppv_tab$PPV_at_data_prevalence[2]`** there but only
+**`r ppv_tab$PPV_at_5pct[2]`** at 5% prevalence: about
+**`r round(1 / ppv_tab$PPV_at_5pct[2])` patients flagged for each one who would
+actually die**. At threshold 0.5 the PPV goes from
+`r ppv_tab$PPV_at_data_prevalence[1]` to `r ppv_tab$PPV_at_5pct[1]`.
+
+**Effect on the recommendation:** in a low-risk population the model's "high risk"
+label would be wrong for the large majority, so it must not be moved to a
+different setting without recalibrating and re-choosing the threshold. The high
+NPV at 5% (`r ppv_tab$NPV_at_5pct[2]`) is not an achievement: 95% of such people
+survive anyway. This makes my recommendation narrower: discussion support in a
+population like this one, and no use at all for screening or low-risk groups.
+(Death-from-disease prevalence also depends on the length of follow-up, so a
+number from this cohort does not transfer directly.)
+
+## 5. If the best performer is hardest to explain
+
+Here the cross-validation leader is the **random forest**
+(`r f2(cvv["Random forest"])`), with the SVM close behind; both are hard to
+explain. Logistic regression is `r round(cvv["Random forest"] - cvv[lr], 3)` lower
+in cross-validation, less than the fold-to-fold standard deviation
+(`r f2(cv_tab$cv_ROC_sd[cv_tab$model == lr])`), and on the test set the paired
+difference (forest minus logistic) is
+`r diffs$mean_diff_ROC[diffs$comparison == "Random forest minus Logistic regression"]`
+with a 95% interval of
+`r diffs$low[diffs$comparison == "Random forest minus Logistic regression"]` to
+`r diffs$high[diffs$comparison == "Random forest minus Logistic regression"]`,
+which includes zero. The forest may also have had a small head start, because it
+helped choose the features.
+
+**To a clinician I would recommend logistic regression** and say this: "Higher
+nodal-prognostic score (NPI), mastectomy and a `MAP3K1` mutation went with higher
+odds of death in these patients (odds ratios per standard deviation
+`r or_tab$odds_ratio_per_SD[or_tab$term == "NPI"]`,
+`r or_tab$odds_ratio_per_SD[or_tab$term == "BREAST_SURGERY.MASTECTOMY"]` and
+`r or_tab$odds_ratio_per_SD[or_tab$term == "MAP3K1"]`; the NPI interval includes 1).
+These are associations, not causes, and the mutation findings are based on very
+few patients."
+
+**What I give up:** possibly a small amount of discrimination (up to about
+`r round(cvv["Random forest"] - cvv[lr], 2)` in cross-validated ROC-AUC, which I
+cannot show to be real), and any non-linear effects or interactions the forest or
+SVM might capture. **What I gain:** each input's effect can be read and
+challenged, the score can be written down and audited, and an odd coefficient
+shows up, as the `SHANK2` one did, instead of hiding inside a black box. If a
+larger external study showed the forest clearly and consistently better, I would
+change the recommendation and add explanation tools, while telling the clinician
+those explanations are approximations of the model, not its reasoning.
